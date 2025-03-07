@@ -1,0 +1,14 @@
+num_test=2
+Dx=0.008
+Dy=0.004
+L=1.
+z_L=1.0 
+A=2
+B=5.45  
+N=50
+T_ini=3.1
+precision=1e-12
+out_dir=./Results/brusslator/
+
+#X_ini=A+0.1*sin(pi*(z/z_L))
+#Y_ini=B/A+0.1*sin(pi*(z/z_L))

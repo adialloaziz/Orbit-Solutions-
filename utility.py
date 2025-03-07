@@ -1,147 +1,182 @@
 import numpy as np
-from scipy.linalg import expm
 from scipy.linalg import solve
-import scipy
-import scipy.integrate
 from scipy.integrate import solve_ivp
+import sys
 
-def newton(f, fprime, x0, epsilon,Nmax):
-    """
-    Newton algorihtm for solving: f(x) = 0 
+def Newton_orbit(f,y0,T_0, Jacf,phase_cond, Max_iter, epsilon):
+
+    dim = np.shape(y0)[0] #The problem dimension
+
+    def big_system(t, Y_M):
+        # Solving numerically the initial value problem (dy/dt,dM/dt = (f(t,y),Jacf*M) 
+        M = Y_M[dim:].reshape((dim, dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
+        dM_dt = Jacf(t,Y_M[:dim]) @ M  # Compute the matrix derivative
+        return np.concatenate([f(t, Y_M[:dim]),dM_dt.flatten(order = 'F')])
     
-    Agrsrs
-    ----------
-    - f: The function f of x
-    - fprime: The derivative of f
-    - x0: Starting point
-    - epsilon: Stopping criterion
-    - Nmax: Maximal number of iterations
 
-    Returns
-    ----------
-    - k: The number of iterations for which we've reached the stopping criterion
-    - xstar: The solution of the problem
-    """
-    k, xstar = 0, x0
-    while (abs(f(xstar))>= epsilon) and k<=Nmax:
-        #xstar=xstar-(1/fprime(xstar))*f(xstar)
-        DX = -(1/fprime(xstar))*f(xstar)
-        xstar = xstar+DX
-        k=k+1
-    return xstar, k
+    def integ_monodromy(ystar_0, Tstar):
+        Y_M = np.zeros((dim+dim**2)) #We solve simustanuously d+d*d ODEs
+        monodromy = np.eye(dim) #Initialisation of the monodromy matrix
+
+        Y_M[:dim] = ystar_0
+        Y_M[dim:] = monodromy.flatten(order='F')
+        big_sol= solve_ivp(big_system, [0.0,Tstar], Y_M,
+                            t_eval=[Tstar],
+                            method="RK45",**{"rtol": 1e-8,"atol":1e-10}) #It's a function of t
+        
+        ystar_T = big_sol.y[:dim,-1]
+        monodromy = big_sol.y[dim:][:,-1] #We take M(T)
+
+        monodromy = monodromy.reshape(dim,dim, order = "F") #Back to the square matrix format
+        return ystar_T, monodromy
     
-def two_points(f, X0, epsilon, Nmax):
+    #________________________________INITIALISATION_________________________________
+    k, ystar_0, y_preced, Tstar = 0, y0, y0, T_0
 
-    k, Xstar, Xold = 0, X0, X0
-    # Delta_f = f(Xstar) - f(Xold)
-    # Delta_X = Xstar - Xold
-    alpha = 1 
-    #For X in R^N we will use an appropriate norm
-    while (abs(f(Xstar)) >= epsilon) and k<=Nmax:
-        Xold = Xstar
-        Xstar = Xstar - alpha*f(Xstar)
-        Delta_X = Xstar - Xold
-        Delta_f = f(Xstar) - f(Xold)
-        alpha = (Delta_X*Delta_f)/abs(Delta_f)**2
-        k = k+1
-    return Xstar, k
-
-def compute_jacobian(f, x, h=1e-5):
-    n = len(x)
-    m = len(f(x))
-    J = np.zeros((m, n))
-
-    for i in range(m):
-        for j in range(n):
-            x_plus = np.copy(x)
-            x_minus = np.copy(x)
-            x_plus[j] += h
-            x_minus[j] -= h
-            J[i, j] = (f(x_plus)[i] - f(x_minus)[i]) / (2 * h)
+    y_by_iter, T_by_iter = np.zeros((Max_iter,dim)),np.zeros((Max_iter))
+    Norm_B, Norm_Deltay = np.zeros((Max_iter)), np.zeros((Max_iter))
+    norm_delta_y = 1 # 
     
-    return J
+    #_____________Newton iteration loop________________
+    while norm_delta_y > epsilon  and k < Max_iter: # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
+        print("Iteration", k, "\n")
+        print("Norm(Dy) = ", norm_delta_y,"\n")
+        y_by_iter[k,:] = ystar_0
+        Norm_Deltay[k] = norm_delta_y
+                
+        y_by_iter[k,:] = ystar_0
+        T_by_iter[k] = Tstar
+        
+        #Soving the whole system over one period
+        ystar_T, monodromy = integ_monodromy(ystar_0, Tstar)
 
-##Runge Kutta method for solving ODE
-def RK4(F,Z0,tf, params,N): 
-    ZZ ,T= [],[] #les element de Y sont des vecteurs de taille d la dimension du problem
-    ZZ.append(Z0)
-    inst=0
-    h=tf/N
-    T.append(inst)
-    while ( inst <= tf):
-        M=np.shape(ZZ)[0]
-        T.append(inst)
-        K_0 = F(ZZ[(M-1)],inst, params)
-        K_1 = F(ZZ[M-1]+(h/2)*K_0, inst,params)
-        K_2 = F(ZZ[M-1]+(h/2)*K_1, inst, params)
-        K_3 = F(ZZ[M-1]+h*K_2, inst, params)
+       #Selecting the phase-condition
+        if (phase_cond == 1 ): #Imposing a maximum or minimum on a component of y at t = 0 
+            d = 0
+            c = Jacf(Tstar,ystar_0)[0,:] 
+            s = f(Tstar,ystar_0)[0]
+        else:
+            if (phase_cond == 2) : #Orthogonality phase-condition
+                d = 0
+                c = f(Tstar,y_preced)
+                s = (ystar_0 - y_preced)@f(Tstar,y_preced)
+        
+        bb = f(Tstar, ystar_T)
+        #Concat the whole matrix
+        top = np.hstack((monodromy - np.eye(dim), bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+        bottom = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+        Mat = np.vstack((top, bottom))  # Vertical stacking of the two rows
+        
+        #Right hand side concatenation
+        B = np.concatenate((ystar_T - ystar_0, np.array([s])))   #np.array([s(Tstar,ystar_0)])))
+        XX = solve(Mat,-B) #Contain Delta_X and Delta_T
+        Delta_y = XX[:dim]
+        Delta_T = XX[-1]
+        
+        #Updating
+        y_preced = ystar_0
+        ystar_0 += Delta_y
+        Tstar += Delta_T
 
-        ZZ.append(ZZ[(M-1)]+(h/6)*(K_0 + 2*K_1 + 2*K_2 + K_3))
-        inst=inst+h
-    T=np.asarray(T)  #On convertit en array
-    ZZ=np.asarray(ZZ) 
-    return T, ZZ
+        norm_delta_y = np.linalg.norm(Delta_y)
+        Norm_B[k] = np.linalg.norm(B)
 
-def RungeKutta(F,yi,params,ti,tf,a,b,N):
-    """
-    Runge-Kutta method with parameters (a,b) applied over the interval [ti,tf]
-      to the Cauchy problem defined by F with initial values (ti,yi) and with
-      a uniform discretization of [ti,tf] in N intervals
- 
-    Parameters
-    -----------
-    
-       F(t,y): function of a scalar and a numpy array of size d returning a numpy
-               array of same size
-       yi: numpy array of size d
-       ti, tf: floats
-       a: numpy array of size  (s-1,s-1) 
-          array defining an explicit method with s stages (neglect first line and last column)
-       b: numpy array of length s
-       N: int
-       
-    Returns
-    ---------
-    
-       T: numpy array of length N+1 
-          array of discrete times
-       Y: numpy array of size (N+1, d) 
-          Y[j,:] is the solution at time T[j]
-    """
-    
-    d = np.shape(yi)[0]
-    Y = np.zeros([N+1, d])
-    T = np.linspace(ti,tf,N+1)
-    h = (tf-ti)/N
-    
-    s = np.shape(b)[0]
-    k = np.zeros([s, d])
-    y, Y[0] = yi, yi
-    for j in range(N):
-        t=T[j]
-        k[0] = F(y,t,params)
-        for i in range(s-1):
-            k[i+1]= F(y + h*np.dot(a[i,:i+1],k[:i+1,:]),t, params)
-        y = y + h*np.dot(b,k)
-        Y[j + 1] = y
-    return T,Y
+        k += 1
 
-def orbit_two_points(f, X_0, Phi_XT,T, Max_iter, epsilon):
-    #Solution of dX/dt = f(X(t))
-    # Phi_XT is the solution at time t=Tn starting at Xstar_0
-    #We need to compute Grad_X(Phi_XT) at X_current
-    #Newton iteration
-    k, Xstar, Xold = 0, X_0, X_0
-    alpha = 1 
-    G_x = Phi_XT - X_0
-    G_Xstar = Phi_XT - Xstar
-    while (np.linalg.norm(G_Xstar) >= epsilon) and k<=Max_iter:
-        Xold = Xstar
-        G_Xold = Phi_XT - Xold
-        Xstar = Xstar - alpha*(G_Xstar)
-        G_Xstar = Phi_XT - Xstar
-        Delta_X = Xstar - Xold
-        Delta_G = G_Xstar - G_Xold
-        alpha = (Delta_X@Delta_G)/(Delta_G@Delta_G)
-        k = k+1
-    return Xstar, k
+    #Computing the monodromy matrix with the reached convergence
+    ystar_T, monodromy = integ_monodromy(ystar_0, Tstar)   
+    return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay, monodromy
+
+
+class BrusselatorModel:
+    def __init__(self, ficname):
+        self.ficname = ficname
+        self.read_params()
+
+    def read_params(self): 
+        with open(self.ficname, 'r') as fic:
+            for line in fic:
+                line = line.strip()  # Remove leading/trailing spaces and newline
+                if not line or line.startswith("#"):  # Ignore empty lines and comments
+                    continue
+                parts = line.split('=')
+                if len(parts) != 2:
+                    print("#########################################")
+                    print("Error in parameter file (Invalid format)")
+                    print(line)
+                    sys.exit(1)
+
+                var, res = parts[0].strip().lower(), parts[1].strip()
+                try:
+                    if var == "dx":
+                        self.Dx = float(res)
+                    elif var == "dy":
+                        self.Dy = float(res)
+                    elif var == "z_l":
+                        self.z_L = float(res)
+                    elif var == "l":
+                        self.L = float(res)
+                    elif var == "a":
+                        self.A = float(res)
+                    elif var == "b":
+                        self.B = float(res)
+                    elif var == "t_ini":
+                        self.T_ini = float(res)
+                    elif var == "precision":
+                        self.precision = float(res)
+                    elif var == 'n':
+                        self.N = int(res)
+                    elif var == 'num_test':
+                        self.num_test = int(res)
+                    elif var == 'out_dir':
+                        self.out_dir = str(res)
+                    else:
+                        raise ValueError(f"Unknown parameter: {var}")
+                
+                except ValueError as e:
+                    print("#########################################")
+                    print("Error in parameter file")
+                    print(line)
+                    print(f"Exception: {e}")
+                    sys.exit(1)
+    
+    def Lap_mat(self, N): #Laplacian Matrix 
+        main_diag = -2 * np.ones(N)
+        off_diag = np.ones(N - 1)
+        return np.diag(main_diag) + np.diag(off_diag, k=1) + np.diag(off_diag, k=-1)
+    
+    def dydt(self, t, y):
+        N, A, B, Dx, Dy, L, z_L = self.N, self.A, self.B, self.Dx, self.Dy, self.L, self.z_L
+        h = z_L / (N - 1)
+        X = y[:N-2]
+        Y = y[N-2:]
+        
+        X_BCs = A * np.eye(1, N-2, 0)[0] + A * np.eye(1, N-2, N-3)[0]
+        Y_BCs = (B/A) * np.eye(1, N-2, 0)[0] + (B/A) * np.eye(1, N-2, N-3)[0]
+        
+        d2Xdz2 = (1/h**2) * (self.Lap_mat(N-2) @ X + X_BCs)
+        d2Ydz2 = (1/h**2) * (self.Lap_mat(N-2) @ Y + Y_BCs)
+        
+        dXdt = Dx/(L**2) * d2Xdz2 + Y * (X**2) - (B+1) * X + A
+        dYdt = Dy/(L**2) * d2Ydz2 - Y * (X**2) + B * X
+        
+        return np.concatenate([dXdt, dYdt])
+    
+    def brusselator_jacobian(self, t, y):
+        N, A, B, Dx, Dy, L, z_L = self.N, self.A, self.B, self.Dx, self.Dy, self.L, self.z_L
+        X = y[:N-2]
+        Y = y[N-2:]
+        n = len(X)
+        h = z_L / (N - 1)
+        
+        alpha_x = Dx / (L*h)**2
+        alpha_y = Dy / (L*h)**2
+        
+        Jxx = alpha_x * self.Lap_mat(n) - (B+1) * np.eye(n) + 2 * np.diag(X * Y)
+        Jyy = alpha_y * self.Lap_mat(n) - np.diag(X**2)
+        Jyx = np.diag(X**2)
+        Jxy = B * np.eye(n) - 2 * np.diag(X * Y)
+        
+        top = np.hstack((Jxx, Jyx))
+        bottom = np.hstack((Jxy, Jyy))
+        return np.vstack((top, bottom))
