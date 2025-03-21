@@ -7,7 +7,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import os
 
 if __name__ == "__main__":
-    param_file = "./brusselator_params_1.in"  #  file containing model parameters
+    param_file = "./brusselator_params_4.in"  #  file containing model parameters
     model = BrusselatorModel(param_file)
     if not(os.path.exists(model.out_dir)): #Create the ouput directory if it doesn't exist
         os.makedirs(model.out_dir)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     fig0.set_size_inches((10,6))
     fig0.suptitle(f'Brusselator model: Newton method convergence check: $L=%.4f$ \n $T* = %.4f$ ' % (model.L, T_by_iter[k-1]))
     fig0.subplots_adjust(left=0.09, bottom=0.1, right=0.95, top=0.90, hspace=0.35, wspace=0.55)
-
+    plt.savefig(model.out_dir + f'convergence_check_test_{model.num_test}')
     #_________Stability check________________
 
     # Extract real and imaginary parts of eigenvalues
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     ax1.set_aspect('equal', 'box')
     ax1.grid(True)
     ax1.legend(loc ="best")
+    plt.savefig(model.out_dir + f'Eigen_values_test_{model.num_test}')
 
     #_________Integrating the equation by starting by y* over T*____________
     y0 = np.array(y_by_iter[k-1])
@@ -116,6 +117,7 @@ if __name__ == "__main__":
     fig2.set_size_inches((10,6))
     fig2.suptitle(f'Brusselator Model with Dirichlet BCs: Periodic orbit after Newton shooting method')
     fig2.subplots_adjust(left=0.09, bottom=0.1, right=0.95, top=0.90, hspace=0.35, wspace=0.55)
+    plt.savefig(model.out_dir + f'orbit_test_{model.num_test}')
 
     #_________Heat map___________________
     fig3, ax3 = plt.subplots(1, 2, figsize=(10, 6))
@@ -136,12 +138,13 @@ if __name__ == "__main__":
     fig3.suptitle('Heatmap of X and Y Concentrations in Brusselator Model')
     plt.tight_layout()
     plt.subplots_adjust(top=0.85)
+    plt.savefig(model.out_dir + f"heatmap_test_{model.num_test}")
 
     #_____Saving the graphs into a pdf file__________
     ficout = model.out_dir + "test%i.pdf" %model.num_test
 
-    with PdfPages(ficout, keep_empty=False) as pdf:
-            pdf.savefig(figure=fig0)
-            pdf.savefig(figure=fig1)
-            pdf.savefig(figure=fig2)
-            pdf.savefig(figure=fig3)
+    # with PdfPages(ficout, keep_empty=False) as pdf:
+    #         pdf.savefig(figure=fig0)
+    #         pdf.savefig(figure=fig1)
+    #         pdf.savefig(figure=fig2)
+    #         pdf.savefig(figure=fig3)
