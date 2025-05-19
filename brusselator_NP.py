@@ -81,7 +81,7 @@ if __name__ == "__main__":
     V_0,_ = np.linalg.qr(V_0) #Orthonormalization of the intital subspace
     #Lunching the Newton-Picard algorithm
     start = time.time()
-    k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay, monodromy = orbit_finder.Newton_Picard_subspace_iter(f,y_ini,
+    k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay, N_time, Np_time = orbit_finder.Newton_Picard_subspace_iter(f,y_ini,
                          model.T_ini, V_0, p0,pe, rho, Jacf, Max_iter,subspace_iter, epsilon)
     end = time.time()
     print("Orbit computation time in seconds: ", end - start)
@@ -103,11 +103,13 @@ if __name__ == "__main__":
     ax[1,1].set_xlabel("Newton iterations")
     ax[1,1].set_ylabel(r"$\parallel \phi(X^*(0),T) - X^*(T) \parallel$")
     fig0.set_size_inches((10,6))
-    fig0.suptitle(r'Brusselator model: Newton method convergence check: $L=%.4f$ \n $T* = %.4f$ ' % (model.L, T_by_iter[k-1]))
+    fig0.suptitle(r'Brusselator model: Newton-Picard method convergence check: $L=%.4f$ \n $T* = %.4f$ ' % (model.L, T_by_iter[k-1]))
     fig0.subplots_adjust(left=0.09, bottom=0.1, right=0.95, top=0.90, hspace=0.35, wspace=0.55)
     # plt.savefig(model.out_dir + f'convergence_check_test_{model.num_test}')
     #_________Stability check________________
-
+    y = np.array(y_by_iter[k-1])
+    T = T_by_iter[k-1]
+    _,monodromy = orbit_finder.integ_monodromy(y,T)
     # Extract real and imaginary parts of eigenvalues
     eigenvalues, eigvec = np.linalg.eig(monodromy)
     real_parts = np.real(eigenvalues)
@@ -129,13 +131,13 @@ if __name__ == "__main__":
     ax1.legend(loc ="best")
     # plt.savefig(model.out_dir + f'Eigen_values_test_{model.num_test}')
 
-    #_________Integrating the equation by starting by y* over T*____________
-    y0 = np.array(y_by_iter[k-1])
-    t_eval = np.linspace(0.0,4*T_by_iter[k-1], 1000)
+    #_________Integrating the equation over the intervall [0,T*] by starting from y*____________
+    
+    t_eval = np.linspace(0.0,4*T, 1000)
 
-    sol = solve_ivp(fun=f,t_span=[0.0, 4*T_by_iter[k-1]],
+    sol = solve_ivp(fun=f,t_span=[0.0, 4*T],
                     t_eval=t_eval, 
-                    y0=y0, method='RK45', 
+                    y0=y, method='RK45', 
                     **{"rtol": 1e-7,"atol":1e-9}
                     )
     X = sol.y[:model.N-2,:]
@@ -170,17 +172,16 @@ if __name__ == "__main__":
     ax3[1].set_xlabel('Time')
     ax3[1].set_ylabel('Spatial Position')
 
-    
     fig3.suptitle('Heatmap of X and Y Concentrations in Brusselator Model')
     plt.tight_layout()
     plt.subplots_adjust(top=0.85)
     # plt.savefig(model.out_dir + f"heatmap_test_{model.num_test}")
 
-    #_____Saving the graphs into a pdf file__________
-    ficout = model.out_dir + "NP_subiter_test%i.pdf" %model.num_test
+    # #_____Saving the graphs into a pdf file__________
+    # ficout = model.out_dir + "NP_subiter_test%i.pdf" %model.num_test
 
-    with PdfPages(ficout) as pdf:
-            pdf.savefig(figure=fig0)
-            pdf.savefig(figure=fig1)
-            pdf.savefig(figure=fig2)
-            pdf.savefig(figure=fig3)
+    # with PdfPages(ficout) as pdf:
+    #         pdf.savefig(figure=fig0)
+    #         pdf.savefig(figure=fig1)
+    #         pdf.savefig(figure=fig2)
+    #         pdf.savefig(figure=fig3)
