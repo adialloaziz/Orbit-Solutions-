@@ -9,7 +9,7 @@ from typing import Callable, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 from time import time
-import imageio
+# import imageio
 import pandas as pd
 def sorted_schur(Se):
     Re, Ye = schur(Se, output='real')
@@ -537,130 +537,130 @@ class orbit:
 
         return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay#, Newton_time, Picard_time
 
-    def NP_project_anim(self, f, y0, T_0, Ve_0, p0, pe, rho, Jacf, Max_iter, subspace_iter, epsilon):
-        """----------Initialization--------"""
-        y_star = y0
-        y_prev = y0
-        T_star = T_0
-        norm_delta_y = 1
-        p = p0
-        y_by_iter = np.zeros((Max_iter, self.dim)) 
-        T_by_iter = np.zeros(Max_iter)
-        Norm_B = np.zeros(Max_iter)
-        Norm_Deltay = np.zeros(Max_iter)
-        images = []
-        # Newton_time, Picard_time = np.zeros(Max_iter), np.zeros(Max_iter)
-        Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
-        p = p0
-        """----------------Shooting loop---------------------------"""
-        for k in range(Max_iter):
-            # Step 1: Solve the ODE to get phi(T)
-            sol = solve_ivp(
-                fun=f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
-                method='RK45', rtol=1e-7, atol=1e-9
-            )
-            phi_T = sol.y[:, -1].copy()
-            #________________________________________________________________#
-            """------Step 2: Compute dominant subspace via subspace iteration with projection"""
-            Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star, f, Jacf, rho, p0, pe, subspace_iter, epsilon)
-            p = max(p0, p_1)  # Ensure p > 0
-            Vp = Ve @ Ye[:, :p] #np.linalg.qr(Ve @ Ye[:, :p])#Orthonormalization
+    # def NP_project_anim(self, f, y0, T_0, Ve_0, p0, pe, rho, Jacf, Max_iter, subspace_iter, epsilon):
+    #     """----------Initialization--------"""
+    #     y_star = y0
+    #     y_prev = y0
+    #     T_star = T_0
+    #     norm_delta_y = 1
+    #     p = p0
+    #     y_by_iter = np.zeros((Max_iter, self.dim)) 
+    #     T_by_iter = np.zeros(Max_iter)
+    #     Norm_B = np.zeros(Max_iter)
+    #     Norm_Deltay = np.zeros(Max_iter)
+    #     images = []
+    #     # Newton_time, Picard_time = np.zeros(Max_iter), np.zeros(Max_iter)
+    #     Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
+    #     p = p0
+    #     """----------------Shooting loop---------------------------"""
+    #     for k in range(Max_iter):
+    #         # Step 1: Solve the ODE to get phi(T)
+    #         sol = solve_ivp(
+    #             fun=f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
+    #             method='RK45', rtol=1e-7, atol=1e-9
+    #         )
+    #         phi_T = sol.y[:, -1].copy()
+    #         #________________________________________________________________#
+    #         """------Step 2: Compute dominant subspace via subspace iteration with projection"""
+    #         Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star, f, Jacf, rho, p0, pe, subspace_iter, epsilon)
+    #         p = max(p0, p_1)  # Ensure p > 0
+    #         Vp = Ve @ Ye[:, :p] #np.linalg.qr(Ve @ Ye[:, :p])#Orthonormalization
 
 
-            #Monitoring the evolution of the eigenvalues of the subspace
-            eigenvalues = np.linalg.eigvals(Re)
-            real_parts = np.real(eigenvalues)
-            imaginary_parts = np.imag(eigenvalues)
-            fig1, ax1 = plt.subplots(figsize=(10, 6))
-            # Plot the unit circle
-            theta = np.linspace(0, 2 * np.pi, 1000)
-            ax1.plot(np.cos(theta), np.sin(theta), 'k--', label='Unit Circle')
-            # Plot the eigenvalues
-            ax1.scatter(real_parts, imaginary_parts, color='r', label='Eigenvalues')
-            ax1.set_xlabel(r'Re($\lambda$)')
-            ax1.set_ylabel(r'Im($\lambda$)')
-            ax1.set_title(f'Eigenvalues of the Monodromy matrix on Complex Plane\n Newton iteration {k}')
-            ax1.set_aspect('equal', 'box')
-            ax1.grid(True)
-            ax1.legend(loc ='upper left')
-            plt.savefig(f"frame_{k}.png")
-            plt.close()
-            images.append(imageio.imread(f"frame_{k}.png"))
+    #         #Monitoring the evolution of the eigenvalues of the subspace
+    #         eigenvalues = np.linalg.eigvals(Re)
+    #         real_parts = np.real(eigenvalues)
+    #         imaginary_parts = np.imag(eigenvalues)
+    #         fig1, ax1 = plt.subplots(figsize=(10, 6))
+    #         # Plot the unit circle
+    #         theta = np.linspace(0, 2 * np.pi, 1000)
+    #         ax1.plot(np.cos(theta), np.sin(theta), 'k--', label='Unit Circle')
+    #         # Plot the eigenvalues
+    #         ax1.scatter(real_parts, imaginary_parts, color='r', label='Eigenvalues')
+    #         ax1.set_xlabel(r'Re($\lambda$)')
+    #         ax1.set_ylabel(r'Im($\lambda$)')
+    #         ax1.set_title(f'Eigenvalues of the Monodromy matrix on Complex Plane\n Newton iteration {k}')
+    #         ax1.set_aspect('equal', 'box')
+    #         ax1.grid(True)
+    #         ax1.legend(loc ='upper left')
+    #         plt.savefig(f"frame_{k}.png")
+    #         plt.close()
+    #         images.append(imageio.imread(f"frame_{k}.png"))
 
-            #________________________________________________________________#
-            """------Step 3: Picard correction (NPGS(l=2))-----------------"""
-            # start_Picard = time()
-            VpVpT = Vp @ Vp.T
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star,
-             T_star, f, Jacf, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
-            # end_Picard = time()
-            # Picard_time[k] = end_Picard -start_Picard
+    #         #________________________________________________________________#
+    #         """------Step 3: Picard correction (NPGS(l=2))-----------------"""
+    #         # start_Picard = time()
+    #         VpVpT = Vp @ Vp.T
+    #         Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
+    #         Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star,
+    #          T_star, f, Jacf, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
+    #         # end_Picard = time()
+    #         # Picard_time[k] = end_Picard -start_Picard
 
-            #_________________________________________________________________#
-            """------Step 4: Newton correction------------------------------"""
-            # start_Newton = time()
-            #Wp = M@Vp    
-            Wp = np.column_stack([
-                self.monodromy_mult(y_star, T_star, f, Jacf, Vp[:, j], method=2, epsilon=1e-6)
-                for j in range(p)
-            ])
-            Sp = Vp.T @ Wp
-            # Build linear system
-            d11 = 0
-            c1 = f(T_star, y_prev) #from the orthogonal phase condition
-            s = (y_star + Delta_q - y_prev) @ c1
-            b1 = Vp.T @ f(T_star, phi_T)
+    #         #_________________________________________________________________#
+    #         """------Step 4: Newton correction------------------------------"""
+    #         # start_Newton = time()
+    #         #Wp = M@Vp    
+    #         Wp = np.column_stack([
+    #             self.monodromy_mult(y_star, T_star, f, Jacf, Vp[:, j], method=2, epsilon=1e-6)
+    #             for j in range(p)
+    #         ])
+    #         Sp = Vp.T @ Wp
+    #         # Build linear system
+    #         d11 = 0
+    #         c1 = f(T_star, y_prev) #from the orthogonal phase condition
+    #         s = (y_star + Delta_q - y_prev) @ c1
+    #         b1 = Vp.T @ f(T_star, phi_T)
 
-            top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
-            #top = np.hstack((Re[:p,:p] - np.eye(p), b1.reshape(-1, 1))) #Converge mais plus lent 
-            bottom = np.hstack(((c1.T@Vp).reshape(1,-1),np.array([[d11]])))
-            Mat = np.vstack((top, bottom))
-            #Right-hand side (B vector)
-            sol = solve_ivp(
-                fun=f, t_span=[0.0, T_star], t_eval=[T_star],
-                y0=y_star + Delta_q, method='RK45', rtol=1e-7, atol=1e-9
-            )
-            r_y0_deltaq = sol.y[:, -1] - y_star
-            B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
-            #________________________________________________________________#
-            """-----Step 5: Solve linear system for Delta_p (Delta_y = Delta_q + Vp @ Delta_p) and Delta_T"""
-            XX = solve(Mat, -B)
-            # end_Newton = time()
-            # Newton_time[k] = end_Newton-start_Newton
-            Delta_y = Delta_q + Vp @ XX[:p]
-            Delta_T = XX[-1]
-            #________________________________________________________________#
-            """------Step 6: Update guess----------------------------------"""
-            y_prev = y_star
-            y_star += Delta_y
-            T_star += Delta_T
+    #         top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
+    #         #top = np.hstack((Re[:p,:p] - np.eye(p), b1.reshape(-1, 1))) #Converge mais plus lent 
+    #         bottom = np.hstack(((c1.T@Vp).reshape(1,-1),np.array([[d11]])))
+    #         Mat = np.vstack((top, bottom))
+    #         #Right-hand side (B vector)
+    #         sol = solve_ivp(
+    #             fun=f, t_span=[0.0, T_star], t_eval=[T_star],
+    #             y0=y_star + Delta_q, method='RK45', rtol=1e-7, atol=1e-9
+    #         )
+    #         r_y0_deltaq = sol.y[:, -1] - y_star
+    #         B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
+    #         #________________________________________________________________#
+    #         """-----Step 5: Solve linear system for Delta_p (Delta_y = Delta_q + Vp @ Delta_p) and Delta_T"""
+    #         XX = solve(Mat, -B)
+    #         # end_Newton = time()
+    #         # Newton_time[k] = end_Newton-start_Newton
+    #         Delta_y = Delta_q + Vp @ XX[:p]
+    #         Delta_T = XX[-1]
+    #         #________________________________________________________________#
+    #         """------Step 6: Update guess----------------------------------"""
+    #         y_prev = y_star
+    #         y_star += Delta_y
+    #         T_star += Delta_T
 
 
 
-            #________________________________________________________________#
-            """----Step 7: Convergence check-------------------------------"""
-            norm_delta_y = np.linalg.norm(Delta_y)
-            y_by_iter[k, :] = y_star
-            Norm_Deltay[k] = norm_delta_y
-            T_by_iter[k] = T_star
-            Norm_B[k] = np.linalg.norm(B)
-            print(f"Iteration {k}: ‖Δy‖ = {norm_delta_y:.3e}, T = {T_star:.5f}, p = {p}")
-            print(f"‖Δq‖ = {np.linalg.norm(Delta_q):.3e}")
-            print(f"‖Δp‖ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
-            if norm_delta_y <= epsilon:
-                print(f"Precision reached within {k+1} iterations")
-                converged = 1
-                break
-            else: 
-                converged = 0
-        # Final monodromy matrix computation
-        # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
-        imageio.mimsave('iterative_animation.gif', images, duration=1)
-        #removing the individuals frame images
-        for i in range(k):
-            os.remove(f"frame_{i}.png")
-        return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
+    #         #________________________________________________________________#
+    #         """----Step 7: Convergence check-------------------------------"""
+    #         norm_delta_y = np.linalg.norm(Delta_y)
+    #         y_by_iter[k, :] = y_star
+    #         Norm_Deltay[k] = norm_delta_y
+    #         T_by_iter[k] = T_star
+    #         Norm_B[k] = np.linalg.norm(B)
+    #         print(f"Iteration {k}: ‖Δy‖ = {norm_delta_y:.3e}, T = {T_star:.5f}, p = {p}")
+    #         print(f"‖Δq‖ = {np.linalg.norm(Delta_q):.3e}")
+    #         print(f"‖Δp‖ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
+    #         if norm_delta_y <= epsilon:
+    #             print(f"Precision reached within {k+1} iterations")
+    #             converged = 1
+    #             break
+    #         else: 
+    #             converged = 0
+    #     # Final monodromy matrix computation
+    #     # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
+    #     imageio.mimsave('iterative_animation.gif', images, duration=1)
+    #     #removing the individuals frame images
+    #     for i in range(k):
+    #         os.remove(f"frame_{i}.png")
+    #     return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
 class BrusselatorModel:
     def __init__(self, ficname):
         self.ficname = ficname
