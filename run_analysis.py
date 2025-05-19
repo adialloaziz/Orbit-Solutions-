@@ -118,6 +118,7 @@ if __name__ == "__main__":
         df.reset_index(drop=True)
         return df
     dim_nz = [16,32,64,128,512]
+    print('N_cores', args.ncores)
     BASE_PATH = Path().parent.resolve()
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
     output_root_dir = BASE_PATH / "Results/"
@@ -129,8 +130,7 @@ if __name__ == "__main__":
     Max_iter = 30
     orbit_method = "Newton_orbit"
     print("Runing method: Newton.........\n")
-    res1 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
+    res1 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
     df1 = pd.concat(res1)
     file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'w') as f:
@@ -140,8 +140,7 @@ if __name__ == "__main__":
     orbit_method ="Newton_Picard_sub_proj"
 
     print("Runing method: Newton-Picard (Subspace iteration with projection).........\n")
-    res2 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
+    res2 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
     
     df2 = pd.concat(res2)
     file_path = f"{Dir_path/orbit_method}.txt"
@@ -152,8 +151,7 @@ if __name__ == "__main__":
 
     orbit_method ="Newton_Picard_simple"
     print("Runing method: Newton-Picard with simple subspace iteration.........\n")
-    res3 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
+    res3 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,N,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for N in dim_nz)
 
     df3 = pd.concat(res3)
     file_path = f"{Dir_path/orbit_method}.txt"
