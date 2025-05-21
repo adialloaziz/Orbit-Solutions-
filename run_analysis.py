@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 from pathlib import Path
 
 from matplotlib.backends.backend_pdf import PdfPages
-import argparse, time, os
+import argparse, time, os, imageio
 from joblib import Parallel, delayed
 import pandas as pd
 from datetime import datetime
@@ -33,18 +33,24 @@ if __name__ == "__main__":
     parser.add_argument(
                     "-p0","--p0", type=int, default = 5,
                     help="""The initial guess of the amount of eigenvectors outside the disc C_rho. It is used as lower limit of p.
-                            Default is 4 """
+                            Default is 5 """
+                      )
+    parser.add_argument(
+                    "-k_dim","--k_dim", type=int, default = 1,
+                    help="""The number of gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
+                            Default is 1 """
                       )
     parser.add_argument(
                     "-NUM_CORES","--ncores", type=int, default = 1,
                     help="""The number of cpus cores to use in the parallel loops.
                             Default is 1 (Sequential run)"""
                       )
-    parser.add_argument(
-                    "-Nz_list","--nz", type=list, default = [20],
-                    help="""The lists of the grid size Nz to use.
-                            Default is 20 (Recall that with the Direchlet BCs, the dynamical system is of dimension 2*(nz-2)"""
-                      )
+    # parser.add_argument(
+    #                 "-Nz_list","--nz",
+    #                 nargs='*',
+    #                 help="""The lists of the grid size Nz to use.
+    #                         Default is 20 (Recall that with the Direchlet BCs, the dynamical system is of dimension 2*(nz-2)"""
+    #                   )
     args = parser.parse_args()
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
     param_file = "./brusselator_params_%i.in" %args.n_file  #  file containing model parameters
@@ -53,15 +59,15 @@ if __name__ == "__main__":
         os.makedirs(model.out_dir)
     print("Loaded file ", model.num_test)
 
-    def run(model,N,p0,pe,rho,Max_iter,subspace_iter,orbit_method):
+    def run(model,n_z,p0,pe,rho,Max_iter,subspace_iter,orbit_method):
         df = pd.DataFrame()
         epsilon = model.precision
-        model.N = N
+        model.n_z = n_z
         f = model.dydt
         Jacf = model.brusselator_jacobian
         #Initialization
-        X0 = model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.N)/model.z_L))
-        Y0 = model.B/model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.N)/model.z_L))
+        X0 = model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
+        Y0 = model.B/model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
         y0 = np.concatenate([X0[1:-1],Y0[1:-1]])
         #We integrate sufficiently the equation to find a good starting point
         phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
@@ -74,7 +80,7 @@ if __name__ == "__main__":
         y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
         orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, Max_iter, epsilon)
         
-        V_0 = orbit_finder.subspace_iter(Ve_ini = np.eye(len(y_T))[:,:p0+pe],
+        V_0 = orbit_finder.subspace_iter(y_T,Ve_ini = np.eye(len(y_T))[:,:p0+pe],
                                     T =  model.T_ini,
                                     phi_t = phi_t,
                                     p0 = p0,
@@ -86,7 +92,7 @@ if __name__ == "__main__":
         "T_0": model.T_ini,
         "Max_iter": Max_iter,
         "epsilon": epsilon,
-        "subspace_iter": subspace_iter,
+        "subsp_iter": subspace_iter,
         "Ve_0": V_0,
         "p0": p0,
         "pe": pe,
@@ -98,16 +104,16 @@ if __name__ == "__main__":
         k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args_func)
                             
         end = time.time()
-        # p0 = p0+2 #We may vary p accordingly to N rather than fixing it
+        # p0 = p0+2 #We may vary p accordingly to n_z rather than fixing it
         results = dict(
             orbit_method = orbit_method,
-            nz = N,
+            nz = n_z,
             p0 = p0,
             pe=pe,
             sub_sp_iter = subspace_iter,
             rho = rho,
             n_iter = k,
-            precison = f"{epsilon:.1e}",
+            precison = f"{Norm_Deltay[k]:.1e}",
             ivp_solves = (subspace_iter*(p0+pe) + 1)*k,
             comput_time = float(f"{end-start:.5f}"),
             T_star = float(f"{T_by_iter[k-1]:.5f}"),
@@ -116,8 +122,8 @@ if __name__ == "__main__":
         df = pd.concat([df,res])
         df.reset_index(drop=True)
         return df
-
-
+    dim_nz = 2 ** np.arange(4,4+args.k_dim)
+    print('N_cores', args.ncores)
     BASE_PATH = Path().parent.resolve()
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
     output_root_dir = BASE_PATH / "Results/"
@@ -129,8 +135,7 @@ if __name__ == "__main__":
     Max_iter = 30
     orbit_method = "Newton_orbit"
     print("Runing method: Newton.........\n")
-    res1 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in args.nz)
+    res1 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
     df1 = pd.concat(res1)
     file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'w') as f:
@@ -140,8 +145,7 @@ if __name__ == "__main__":
     orbit_method ="Newton_Picard_sub_proj"
 
     print("Runing method: Newton-Picard (Subspace iteration with projection).........\n")
-    res2 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for N in args.nz)
+    res2 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
     
     df2 = pd.concat(res2)
     file_path = f"{Dir_path/orbit_method}.txt"
@@ -152,8 +156,7 @@ if __name__ == "__main__":
 
     orbit_method ="Newton_Picard_simple"
     print("Runing method: Newton-Picard with simple subspace iteration.........\n")
-    res3 = Parallel(n_jobs=args.ncores, prefer='processes',
-               timeout=1000)(delayed(run)(model,N,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for N in args.nz)
+    res3 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
 
     df3 = pd.concat(res3)
     file_path = f"{Dir_path/orbit_method}.txt"

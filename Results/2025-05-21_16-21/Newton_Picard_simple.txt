@@ -1,0 +1,2 @@
+           orbit_method  nz  p0  pe  sub_sp_iter  rho  n_iter precison  ivp_solves  comput_time   T_star
+0  Newton_Picard_simple  16   5   2            5  0.5      29  1.6e-03        1044     97.98429  3.43434

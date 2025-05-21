@@ -5,12 +5,12 @@ L=1.
 z_L=1.0 
 A=2
 B=5.45  
-N=30
+n_z=30
 T_ini=3.1
 #T_ini=3.4 for EVA
 precision=1e-9
 #precision=1e-12
-#precision=1e-9 pour le test du temps de caluc en fonction de N
+#precision=1e-9 pour le test du temps de calcul en fonction de n-z
 out_dir=./Results/brusslator/
 
 #X_ini=A+0.1*sin(pi*(z/z_L))
