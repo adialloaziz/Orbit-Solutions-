@@ -665,6 +665,7 @@ class BrusselatorModel:
     def __init__(self, ficname):
         self.ficname = ficname
         self.read_params()
+        # self.Lap = self.Lap_mat() #To avoid several call in the next functions
 
     def read_params(self): 
         with open(self.ficname, 'r') as fic:
@@ -713,9 +714,9 @@ class BrusselatorModel:
                     print(f"Exception: {e}")
                     sys.exit(1)
     
-    def Lap_mat(self, n_z): #Laplacian Matrix 
-        main_diag = -2 * np.ones(n_z)
-        off_diag = np.ones(n_z - 1)
+    def Lap_mat(self,n): #Laplacian Matrix 
+        main_diag = -2 * np.ones(n)
+        off_diag = np.ones(n - 1)
         return np.diag(main_diag) + np.diag(off_diag, k=1) + np.diag(off_diag, k=-1)
     
     def dydt(self, t, y):

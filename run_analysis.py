@@ -1,16 +1,16 @@
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.linalg import solve,schur
+#from scipy.linalg import solve,schur
 from utility import orbit, BrusselatorModel, call_method
-import sys
-from scipy.sparse.linalg import LinearOperator
-from scipy.sparse.linalg import eigs
-from scipy.interpolate import interp1d
+#import sys
+#from scipy.sparse.linalg import LinearOperator
+#from scipy.sparse.linalg import eigs
+#from scipy.interpolate import interp1d
 from pathlib import Path
 
-from matplotlib.backends.backend_pdf import PdfPages
-import argparse, time, os, imageio
+#from matplotlib.backends.backend_pdf import PdfPages
+import argparse, time, os
 from joblib import Parallel, delayed
 import pandas as pd
 from datetime import datetime
@@ -118,10 +118,11 @@ if __name__ == "__main__":
             comput_time = float(f"{end-start:.5f}"),
             T_star = float(f"{T_by_iter[k-1]:.5f}"),
         )
-        res = pd.DataFrame(results, index=[0])
-        df = pd.concat([df,res])
-        df.reset_index(drop=True)
-        return df
+        # res = pd.DataFrame(results, index=[0])
+        # df = pd.concat([df,res])
+        # df.reset_index(drop=True)
+        return results
+        
     dim_nz = 2 ** np.arange(4,4+args.k_dim)
     print('N_cores', args.ncores)
     BASE_PATH = Path().parent.resolve()

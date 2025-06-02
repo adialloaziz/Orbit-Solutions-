@@ -1,0 +1,2 @@
+   orbit_method  nz  p0  pe  sub_sp_iter  rho  n_iter precison  ivp_solves  comput_time   T_star
+0  Newton_orbit  16   5   2            5  0.5       5  7.0e-15         180      0.93371  3.43434
