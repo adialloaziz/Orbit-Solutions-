@@ -1,0 +1,6 @@
+{'orbit_method': 'Newton_orbit', 'nz': 16, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 5, 'precison': 4.255472731876119e-15, 'ivp_solves': 180, 'comput_time': 3.6986541748046875, 'T_star': 3.4343403207955556}
+{'orbit_method': 'Newton_orbit', 'nz': 32, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 5, 'precison': 1.036264480715238e-14, 'ivp_solves': 180, 'comput_time': 9.66565728187561, 'T_star': 3.434856374899688}
+{'orbit_method': 'Newton_orbit', 'nz': 64, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 5, 'precison': 2.2473063734423408e-14, 'ivp_solves': 180, 'comput_time': 13.543460369110107, 'T_star': 3.4349683073197395}
+{'orbit_method': 'Newton_orbit', 'nz': 128, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 5, 'precison': 1.2080726531872277e-11, 'ivp_solves': 180, 'comput_time': 102.41696763038635, 'T_star': 3.434994911280012}
+{'orbit_method': 'Newton_orbit', 'nz': 256, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 9, 'precison': 4.1938533585799106e-10, 'ivp_solves': 324, 'comput_time': 1480.7719519138336, 'T_star': 3.43500142123971}
+{'orbit_method': 'Newton_orbit', 'nz': 512, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 29, 'precison': 6.215371904335767e-09, 'ivp_solves': 1044, 'comput_time': 82109.3561296463, 'T_star': 3.435003032699054}

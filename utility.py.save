@@ -1,0 +1,82 @@
+# -*- coding: utf-8 -*-
+import numpy as np
+from scipy.linalg import solve, schur
+from scipy.integrate import solve_ivp
+from scipy.interpolate import interp1d
+from scipy.sparse.linalg import eigs
+from scipy.sparse.linalg import LinearOperator
+import sys, os, scipy as sp
+from typing import Callable, Optional
+import matplotlib.pyplot as plt
+import numpy as np
+from time import time
+#import imageio
+#import pandas as pd
+def sorted_schur(Se):
+    Re, Ye = schur(Se, output='real')
+    #Sorting according to the decreasing in modulus of the eigenvalues
+    eigenvalues,_ = np.linalg.eig(Re)
+    sorted_indices = np.argsort(np.abs(eigenvalues))[::-1]  # Sorting by decreasing modulus value
+    Re_sorted = Re[sorted_indices, :][:, sorted_indices]
+    Ye_sorted = Ye[:, sorted_indices]
+    return Re_sorted, Ye_sorted
+
+
+def eig_quasi_upper(T):
+    """Compute the eigenvalues of a quasi-upper triangular matrix"""
+
+    N = T.shape[0]
+    e_vals = np.zeros((N,), dtype=complex)
+    i = 0
+    while i < N-1:
+        if i < N - 1 and abs(T[i+1, i]) > 1e-12:  # 2×2 block
+            block = T[i:i+2, i:i+2]
+            # print('here')
+            e_vals[i:i+2] = np.linalg.eigvals(block) #Not expensive: Only a 2-by-2 block
+            i += 2
+        else:
+            e_vals[i] = T[i, i]
+            i += 1
+    return e_vals
+  
+
+class orbit:
+    def __init__(self, f,y0,T_0, Jacf,phase_cond, Max_iter, epsilon):
+        self.dim = np.shape(y0)[0] #The problem dimension
+        self.f = f
+        self.y0 = y0
+        self.T_0 = T_0
+        self.Jacf = Jacf
+        self.phase_cond = phase_cond
+        self.Max_iter = Max_iter
+        self.epsilon = epsilon
+        # self.method = Newton_orbit
+    def big_system(self,t, Y_M):
+        # Solving numerically the initial value problem (dy/dt,dM/dt = (f(t,y),Jacf*M) 
+        M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
+        dM_dt = self.Jacf(t,Y_M[:self.dim]) @ M  # Compute the matrix derivative
+        return np.concatenate([self.f(t, Y_M[:self.dim]),dM_dt.flatten(order = 'F')])
+    def monodromy_mult(self,y, T, v, method = 1, epsilon = 1e-6):
+        """
+            M*v Matrix-vector multiplication using 
+            difference formula to avoid computing the monodromy matrix.
+            Args:
+                    y0: Starting point;
+                    T: Time to compute the solution;
+                    method: Integer. 1(default)for finite difference approximation;
+                                    2 for variational form approximation;
+                    epsilon: Tolerance(Default = 1e-6) in the finite difference approach.
+        """        
+        if method == 1 :
+            sol = solve_ivp(fun=self.f,t_span=[0.0, T],
+                            t_eval=[T], 
+                            y0=y, method='RK45', 
+                            **{"rtol": 1e-7,"atol":1e-9}
+                            )
+            phi_0_T = sol.y[:,-1]
+            sol1 = solve_ivp(fun=self.f,t_span=[0.0, T],
+                            t_eval=[T], 
+                            y0=y + epsilon*v, method='RK45', 
+                            **{"rtol": 1e-7,"atol":1e-9}
+                            )
+            phi_v_T = sol1.y[:,-1]

@@ -1,0 +1,1 @@
+{'orbit_method': 'Newton_Picard_simple', 'nz': 16, 'p0': 5, 'pe': 2, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 29, 'precison': 0.0016100255456777068, 'ivp_solves': 1044, 'comput_time': 242.0326373577118, 'T_star': 3.4343403201085123}

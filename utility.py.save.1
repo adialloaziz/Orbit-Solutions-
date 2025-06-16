@@ -29,7 +29,7 @@ def eig_quasi_upper(T):
     e_vals = np.zeros((N,), dtype=complex)
     i = 0
     while i < N-1:
-        if i < N - 1 and abs(T[i+1, i]) > 1e-12:  # 2-by-2 block
+        if i < N - 1 and abs(T[i+1, i]) > 1e-12:  # 2×2 block
             block = T[i:i+2, i:i+2]
             # print('here')
             e_vals[i:i+2] = np.linalg.eigvals(block) #Not expensive: Only a 2-by-2 block
@@ -239,7 +239,7 @@ class orbit:
             # y_by_iter[k,:] = y_star
             T_by_iter[k] = T_star
 
-            print(f"Iteration {k}: $||\Delta y||$= {Norm_Deltay[k]:.3e}, T = {T_star:.5f}")
+            print(f"Iteration {k}:  $||\Delta y||= {Norm_Deltay[k]:.3e}, T = {T_star:.5f}")
 
             if Norm_Deltay[k] <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
@@ -332,9 +332,9 @@ class orbit:
             Norm_Deltay[k] = np.linalg.norm(Delta_y)
             Norm_B[k] = np.linalg.norm(B)
 
-            print(f"Iteration {k}: $||\Delta y||$ = {Norm_Deltay[k]:.3e}, T = {T_star:.5f}, p = {p}")
-            print(f"$||\Delta q||$ = {np.linalg.norm(Delta_q):.3e}")
-            print(f"$||\Delta p||$ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
+            print(f"Iteration {k}: $||\Delta y ||$ = {Norm_Deltay[k]:.3e}, T = {T_star:.5f}, p = {p}")
+            print(f" $||\Delta q ||$ = {np.linalg.norm(Delta_q):.3e}")
+            print(f" $||\Delta p = {np.linalg.norm(Vp @ XX[:p]):.3e}")
 
             if Norm_Deltay[k] <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
@@ -427,9 +427,9 @@ class orbit:
             Norm_DeltaY[k] = norm_delta_y
             Norm_B[k] = np.linalg.norm(B)
 
-            print(f"Iteration {k}: $||\Delta y||$ = {norm_delta_y:.3e}, T = {T_star:.5f}, p = {p}")
-            print(f"$||\Delta q||$= {np.linalg.norm(Delta_q):.3e}")
-            print(f"$||\Delta p||$ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
+            print(f"Iteration {k}: ||\Delta y = {norm_delta_y:.3e}, T = {T_star:.5f}, p = {p}")
+            print(f"‖Δq‖ = {np.linalg.norm(Delta_q):.3e}")
+            print(f"‖Δp‖ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
 
             if norm_delta_y <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
@@ -524,9 +524,9 @@ class orbit:
             Norm_Deltay[k] = np.linalg.norm(Delta_y)
             T_by_iter[k] = T_star
             Norm_B[k] = np.linalg.norm(B)
-            print(f"Iteration {k}:$||\Delta y ||$ = {Norm_Deltay[k]:.3e}, T = {T_star:.5f}, p = {p}")
-            print(f"$||\Delta q ||$ = {np.linalg.norm(Delta_q):.3e}")
-            print(f"$||\Delata p || $= {np.linalg.norm(Vp @ XX[:p]):.3e}")
+            print(f"Iteration {k}: ‖Δy‖ = {Norm_Deltay[k]:.3e}, T = {T_star:.5f}, p = {p}")
+            print(f"‖Δq‖ = {np.linalg.norm(Delta_q):.3e}")
+            print(f"‖Δp‖ = {np.linalg.norm(Vp @ XX[:p]):.3e}")
             if Norm_Deltay[k] <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
                 converged = 1

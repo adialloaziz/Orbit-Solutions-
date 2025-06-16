@@ -1,18 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.linalg import solve,schur
 from utility import orbit, BrusselatorModel, call_method
-import sys
-from scipy.sparse.linalg import LinearOperator
-from scipy.sparse.linalg import eigs
-from scipy.interpolate import interp1d
 from pathlib import Path
-
-from matplotlib.backends.backend_pdf import PdfPages
-import argparse, time, os, imageio
+import argparse, time, os
 from joblib import Parallel, delayed
-import pandas as pd
 from datetime import datetime
 
 
@@ -52,15 +43,17 @@ if __name__ == "__main__":
     #                         Default is 20 (Recall that with the Direchlet BCs, the dynamical system is of dimension 2*(nz-2)"""
     #                   )
     args = parser.parse_args()
-    today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    param_file = "./brusselator_params_%i.in" %args.n_file  #  file containing model parameters
+    #today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+    BASE_PATH = Path().parent.resolve()
+    file = "brusselator_params_%i.in" %args.n_file
+    param_file = BASE_PATH/file  #  file containing model parameters
     model = BrusselatorModel(param_file)
     if not(os.path.exists(model.out_dir)): #Create the ouput directory if it doesn't exist
         os.makedirs(model.out_dir)
     print("Loaded file ", model.num_test)
 
     def run(model,n_z,p0,pe,rho,Max_iter,subspace_iter,orbit_method):
-        df = pd.DataFrame()
+      
         epsilon = model.precision
         model.n_z = n_z
         f = model.dydt
@@ -113,18 +106,18 @@ if __name__ == "__main__":
             sub_sp_iter = subspace_iter,
             rho = rho,
             n_iter = k,
-            precison = f"{Norm_Deltay[k]:.1e}",
+            precison = Norm_Deltay[k],
             ivp_solves = (subspace_iter*(p0+pe) + 1)*k,
-            comput_time = float(f"{end-start:.5f}"),
-            T_star = float(f"{T_by_iter[k-1]:.5f}"),
+            comput_time = end-start,
+            T_star = T_by_iter[k-1],
         )
-        res = pd.DataFrame(results, index=[0])
-        df = pd.concat([df,res])
-        df.reset_index(drop=True)
-        return df
+        # res = pd.DataFrame(results, index=[0])
+        #df = pd.concat([df,res])
+        #df.reset_index(drop=True)
+        return results
     dim_nz = 2 ** np.arange(4,4+args.k_dim)
     print('N_cores', args.ncores)
-    BASE_PATH = Path().parent.resolve()
+    #BASE_PATH = Path().parent.resolve()
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
     output_root_dir = BASE_PATH / "Results/"
     Dir_path = Path(output_root_dir/today_analysis)
@@ -136,32 +129,30 @@ if __name__ == "__main__":
     orbit_method = "Newton_orbit"
     print("Runing method: Newton.........\n")
     res1 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
-    df1 = pd.concat(res1)
+    #df1 = pd.concat(res1)
     file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'w') as f:
-        df_string = df1.to_string()
-        f.write(df_string)
+        for item in res1:
+            f.write(str(item) + '\n')
 
     orbit_method ="Newton_Picard_sub_proj"
 
     print("Runing method: Newton-Picard (Subspace iteration with projection).........\n")
     res2 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe, rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
     
-    df2 = pd.concat(res2)
+    #df2 = pd.concat(res2)
     file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'w') as f:
-        df_string = df2.to_string()
-        f.write(df_string)
+        for item in res2:
+            f.write(str(item) + '\n')
+    #orbit_method ="Newton_Picard_simple"
+    #print("Runing method: Newton-Picard with simple subspace iteration.........\n")
+    #res3 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
 
-
-    orbit_method ="Newton_Picard_simple"
-    print("Runing method: Newton-Picard with simple subspace iteration.........\n")
-    res3 = Parallel(n_jobs=args.ncores, prefer='processes')(delayed(run)(model,n_z,p0,pe,rho,Max_iter,subspace_iter, orbit_method) for n_z in dim_nz)
-
-    df3 = pd.concat(res3)
-    file_path = f"{Dir_path/orbit_method}.txt"
-    with open(file_path, 'w') as f:
-        df_string = df3.to_string()
-        f.write(df_string)
-
+    #df3 = pd.concat(res3)
+    #file_path = f"{Dir_path/orbit_method}.txt"
+    #with open(file_path, 'w') as f:
+     #   for item in res3:
+      #      f.write(str(item) + '\n')
+           
     print("Analysis done")
