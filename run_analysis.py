@@ -1,15 +1,7 @@
 import numpy as np
-#import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-#from scipy.linalg import solve,schur
 from utility import orbit, BrusselatorModel, call_method
-#import sys
-#from scipy.sparse.linalg import LinearOperator
-#from scipy.sparse.linalg import eigs
-#from scipy.interpolate import interp1d
 from pathlib import Path
-
-#from matplotlib.backends.backend_pdf import PdfPages
 import argparse, time, os
 from joblib import Parallel, delayed
 import pandas as pd
@@ -74,7 +66,7 @@ if __name__ == "__main__":
                     t_eval=[16*model.T_ini],
                     dense_output=True,
                     y0=y0, method='RK45', 
-                    **{"rtol": 1e-10,"atol":1e-12}
+                    **{"rtol": 1e-7,"atol":1e-9}
                     )
         
         y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point

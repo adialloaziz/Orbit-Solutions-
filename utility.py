@@ -5,6 +5,8 @@ from scipy.interpolate import interp1d
 from scipy.sparse.linalg import eigs
 from scipy.sparse.linalg import LinearOperator
 import sys, os, scipy as sp
+from types import SimpleNamespace
+
 from typing import Callable, Optional
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,13 +42,16 @@ def eig_quasi_upper(T):
   
 
 class orbit:
-    def __init__(self, f,y0,T_0, Jacf,phase_cond, Max_iter, epsilon):
+    def __init__(self, f,y0,T_0, Jacf,phase_cond, ode_solver,method,solver_steps, Max_iter, epsilon):
         self.dim = np.shape(y0)[0] #The problem dimension
         self.f = f
         self.y0 = y0
         self.T_0 = T_0
         self.Jacf = Jacf
         self.phase_cond = phase_cond
+        self.ode_solver = ode_solver
+        self.method = method
+        self.solver_steps = solver_steps
         self.Max_iter = Max_iter
         self.epsilon = epsilon
         # self.method = Newton_orbit
@@ -67,46 +72,71 @@ class orbit:
                     epsilon: Tolerance(Default = 1e-6) in the finite difference approach.
         """        
         if method == 1 :
-            sol = solve_ivp(fun=self.f,t_span=[0.0, T],
+            sol = self.ode_solver(fun=self.f,t_span=[0.0, T],
                             t_eval=[T], 
-                            y0=y, method='RK45', 
-                            **{"rtol": 1e-7,"atol":1e-9}
+                            y0=y, method=self.method, 
+                            **{"rtol": 1e-7,"atol":1e-9},
+                            steps = 1000,
                             )
             phi_0_T = sol.y[:,-1]
-            sol1 = solve_ivp(fun=self.f,t_span=[0.0, T],
+            sol1 = self.ode_solver(fun=self.f,t_span=[0.0, T],
                             t_eval=[T], 
-                            y0=y + epsilon*v, method='RK45', 
-                            **{"rtol": 1e-7,"atol":1e-9}
+                            y0=y + epsilon*v, method=self.method, 
+                            **{"rtol": 1e-7,"atol":1e-9},
+                            steps = 1000,
                             )
             phi_v_T = sol1.y[:,-1]
 
             Mv = (phi_v_T - phi_0_T)/epsilon
         elif method == 2 :
-            def Mv_system(t, Y_Mv):
-                # Solving numerically the initial value problem (dMv/dt = (Jacf*Mv, Mv(0) = v)
-                dMv_dt = self.Jacf(t,Y_Mv[:self.dim]) @ Y_Mv[self.dim:]  # 
-                return np.concatenate([self.f(t, Y_Mv[:self.dim]),dMv_dt])
-
-            y_v0 = np.concatenate([y, v])
-            sol_mv = solve_ivp(fun = Mv_system, y0 = y_v0, t_span=[0.0,T], t_eval=[T],method='RK45', 
-                            **{"rtol": 1e-7,"atol":1e-9})
+            # Using the variational form to compute the monodromy matrix
+            def Mv_system(t, Y_MV):
+                # Solving numerically the initial value problem (dMv/dt = (Jacf*MV, MV(0) = V of dim N x m)
+                V_full = Y_MV[self.dim:].reshape((self.dim, -1), order='F')  # Reshape the flat array back into a dim x m matrix
+                dMV_dt = self.Jacf(t,Y_MV[:self.dim]) @ V_full
+                return np.concatenate([self.f(t, Y_MV[:self.dim]),dMV_dt.flatten(order='F')])
+            
+            V_flat = v.flatten(order ='F') 
+            y_v0 = np.concatenate([y, V_flat])
+            sol_mv = self.ode_solver(fun = Mv_system, y0 = y_v0, t_span=[0.0,T], t_eval=[T],method=self.method, 
+                            **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
             Mv = sol_mv.y[self.dim:,-1]
+            # Mv = Mv.reshape((self.dim, v.shape[1]), order = 'F') #To be defined as a LinearOperator
+            Mv = Mv.reshape((self.dim, -1), order='F')
         else :
             print("Error in monodromy mult: Unavailable method. method should be 1 or 2.")
             sys.exit(1)
 
         return Mv
+    def monodromy_mult_matvec(self,y, T, v, method = 1, epsilon = 1e-6):
+            
+
+        def Mv_system(t, Y_MV):
+            # Solving numerically the initial value problem (dMv/dt = (Jacf*MV, MV(0) = V of dim N x m)
+
+            dMV_dt = self.Jacf(t,Y_MV[:self.dim]) @ Y_MV[self.dim:]  # 
+            return np.concatenate([self.f(t, Y_MV[:self.dim]),dMV_dt])
+         
+        y_v0 = np.concatenate([y, v])
+        sol_mv = self.ode_solver(fun = Mv_system, y0 = y_v0, t_span=[0.0,T], t_eval=[T],method=self.method, 
+                        **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
+        Mv = sol_mv.y[self.dim:,-1]
+
+        return Mv
+
+
     def monodromy_mult2(self,T, v,phi_t):
         def Mv_system(t, Mv,phi_t):
             # Solving numerically the initial value problem (dMv/dt = (Jacf*Mv, Mv(0) = v)
+            # here the solution phi_t is supposed to be already computed for all t in [0, T] 
             J = self.Jacf(t,phi_t.sol(t))
             dMv_dt = J @ Mv # 
             # dMv_dt = Jacf(t,phi_t.y[:,np.argmin(np.abs(phi_t.t - t))]) @ Mv
             return dMv_dt
 
-        sol_mv = solve_ivp(fun = lambda t,Mv: Mv_system(t,Mv, phi_t), y0 = v, t_span=[0.0,T],
-                t_eval=[T],method='RK45', 
-                **{"rtol": 1e-10,"atol":1e-12})
+        sol_mv = self.ode_solver(fun = lambda t,Mv: Mv_system(t,Mv, phi_t), y0 = v, t_span=[0.0,T],
+                t_eval=[T],method=self.method, 
+                **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
         Mv = sol_mv.y[:,-1] #To be defined as a LinearOperator
         return Mv
 
@@ -128,6 +158,7 @@ class orbit:
             #Stoping criterion in term of eigenvalues of Re in the real Schur decomposition
 
         return Ve
+    
 
     def subsp_iter_projec(    
         self,
@@ -142,17 +173,54 @@ class orbit:
         tol: float = None
         ):   
         Ve = Ve_ini.copy()
+        MV = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y,T,v, method = 2, epsilon = 1e-6),
+                             matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
+        
+        for k in range(max_iter):
+            # Apply monodromy operator to each vector in Ve
+            # We = np.column_stack([
+            #     self.monodromy_mult(y, T, Ve[:, j], method=2, epsilon=1e-6)
+            #     for j in range(p0 + pe)
+            # ])
+            We = MV @ Ve
+            # We = self.monodromy_mult(y, T, Ve, method = 2, epsilon = 1e-6)
+            # Project back onto the current subspace (basic projection step)
+            Se = Ve.T @ We
+            # Schur decomposition (real) of the small matrix Se
+            Re, Ye,p = schur(Se, output='real',sort= lambda x,y: np.sqrt(x**2 + y**2) > rho)
+            # Rotate Ve using the sorted Schur vectors
+            Ve_new = We @ Ye
+            # Re-orthonormalize (QR)
+            Ve, _ = np.linalg.qr(Ve_new)
+
+            # (Optional) Check convergence
+            # if np.linalg.norm(Ve - Ve_old) < tol:
+            #     print("Convergence with tolerance reached") 
+            #     break
+        return Re, Ye, Ve, We, p
+    def subsp_iter_projec2(    
+        self,
+        Ve_ini : any,
+        y : any, 
+        T : float,
+        rho : float,
+        p0 : int,
+        pe : int,
+        max_iter : int,
+        phi_t : Optional[any] = None,
+        tol: float = None
+        ):   
+        Ve = Ve_ini.copy()
+        # MV = LinearOperator((self.dim,self.dim),matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
         
         for k in range(max_iter):
             # Apply monodromy operator to each vector in Ve
             We = np.column_stack([
-                self.monodromy_mult(y, T, Ve[:, j], method=2, epsilon=1e-6)
+                self.monodromy_mult_matvec(y, T, Ve[:, j], method=2, epsilon=1e-6)
                 for j in range(p0 + pe)
             ])
-            # We = np.column_stack([
-            #     self.monodromy_mult2(T, Jacf, Ve[:, j],phi_t)
-            #     for j in range(p0 + pe)
-            # ])
+            # We = MV @ Ve
+            # We = self.monodromy_mult_matvec(y, T, Ve, method = 2, epsilon = 1e-6)
             # Project back onto the current subspace (basic projection step)
             Se = Ve.T @ We
             # Schur decomposition (real) of the small matrix Se
@@ -175,35 +243,35 @@ class orbit:
         eigenval, Vp = eigs(Mv, k=p, which = 'LM', v0 = v0)#,maxiter=100)
         return eigenval, Vp   
 
-    def integ_monodromy(self,y, T):
-        Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
-        monodromy = np.eye(self.dim) #Initialisation of the monodromy matrix
+    def integ_monodromy(self,y0,M0, T):
+        # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
+        # monodromy = np.eye(self.dim) #Initialisation of the monodromy matrix
 
-        Y_M[:self.dim] = y
-        Y_M[self.dim:] = monodromy.flatten(order='F')
-        big_sol= solve_ivp(self.big_system, [0.0,T], Y_M,
+        # Y_M[:self.dim] = y0
+        # Y_M[self.dim:] = M0.flatten(order='F')
+        Y_M = np.concatenate([y0, M0.flatten(order='F')]) #Initial condition for the ODE system
+        big_sol= self.ode_solver(fun = self.big_system, t_span= (0.0,T),y0=Y_M,
                             t_eval=[T],
-                            method="RK45",**{"rtol": 1e-8,"atol":1e-10}) #It's a function of t
+                            method=self.method,
+                            rtol = 1e-7, atol = 1e-9, steps = self.solver_steps) #It's a function of t
         
-        phi_T = big_sol.y[:self.dim,-1]
+        # phi_T = big_sol.y[:self.dim,-1]
         monodromy = big_sol.y[self.dim:][:,-1] #We take M(T)
 
         monodromy = monodromy.reshape(self.dim,self.dim, order = "F") #Back to the square matrix format
-        return phi_T, monodromy    
+        return big_sol.y[:self.dim,-1], monodromy   
     def Newton_orbit(self,y0,T_0, Max_iter, epsilon,phase_cond = 2):
         #________________________________INITIALISATION_________________________________
-        y_star, y_prev, T_star = y0, y0, T_0
+        y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
 
         y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
         Norm_B, Norm_Deltay = np.zeros((Max_iter)), np.zeros((Max_iter)) 
-
-        phi_0, monodromy_0 = self.integ_monodromy(y_star, T_star)
-        
+        I = np.eye(self.dim)
         #_____________Newton iteration loop________________
         for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
             
             #Soving the whole system over one period
-            phi_T, monodromy = self.integ_monodromy(y_star, T_star)
+            phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
 
         #Selecting the phase-condition
             if (phase_cond == 1 ): #Imposing a maximum or minimum on a component of y at t = 0 
@@ -218,7 +286,7 @@ class orbit:
             
             bb = self.f(T_star, phi_T)
             #Concat the whole matrix
-            top = np.hstack((monodromy - np.eye(self.dim), bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+            top = np.hstack((monodromy - I, bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
             bottom = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
             Mat = np.vstack((top, bottom))  # Vertical stacking of the two rows
             
@@ -247,8 +315,6 @@ class orbit:
             else: 
                 converged = 0
 
-        #Computing the monodromy matrix with the reached convergence
-        # phi_T, monodromy = self.integ_monodromy(y_star, T_star)   
         return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
 
     def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=None, Ve_0 = None, p0=None, pe=None, rho=None):
@@ -265,12 +331,13 @@ class orbit:
         """----------------Shooting loop---------------------------"""
         for k in range(Max_iter):
             """------Step1: Integrate up to T_star to get phi_T"""
-            phi_interp = solve_ivp(self.f, [0.0, T_star], y_star, t_eval=[T_star],
-                            dense_output=True, #Return a continuous solution
-                            method='RK45', rtol=1e-10, atol=1e-12)
+            phi_interp = self.ode_solver(fun = self.f, t_span = [0.0, T_star], y0 = y_star,
+                                          t_eval=[T_star],
+                            dense_output=False, #Return a continuous solution if set to true
+                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
             
             # phi_t = interp1d(sol.t, sol.y, kind='cubic', fill_value="extrapolate") #Interpolating the solution to use it in the variational formulation
-            phi_T = phi_interp.y[:, -1].copy()
+            # phi_T = phi_interp.y[:, -1]
             """------Step 2: Compute dominant subspace via the IRAM method"""
             Ve = self.subspace_iter(y_star, Ve,T_star, phi_interp,p,pe,subsp_iter)
             # Schur decomposition of Se = Ve^T M Ve
@@ -310,8 +377,8 @@ class orbit:
             Mat = np.vstack((top, bottom))
 
             # Right-hand side (Taylor approx)
-            sol = solve_ivp(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
-                            method='RK45', rtol=1e-10, atol=1e-12)
+            sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
+                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
             r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
             B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
             #________________________________________________________________#
@@ -361,9 +428,9 @@ class orbit:
         """----------------Shooting loop---------------------------"""
         for k in range(Max_iter):
             """------Step1: Integrate up to T_star to get phi_T"""
-            sol = solve_ivp(self.f, [0.0, T_star], y_star, t_eval=[T_star],
-                            method='RK45', rtol=1e-7, atol=1e-9)
-            phi_T = sol.y[:, -1].copy()
+            sol = self.ode_solver(self.f, [0.0, T_star], y_star, t_eval=[T_star],
+                            method=self.method, rtol=1e-7, atol=1e-9, steps=self.solver_steps)
+            # phi_T = sol.y[:, -1]
             """------Step 2: Compute dominant subspace via the IRAM method"""
             eigenvals, Ve = self.base_Vp(v0, y_star, T_star, p + pe, epsilon)
             Ve = np.real(Ve) #Ce n'est pas la base complete
@@ -383,8 +450,8 @@ class orbit:
             #________________________________________________________________#
             """------Step 3: Picard correction (NPGS(l=2))-----------------"""
             VpVpT = Vp @ Vp.T
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star, T_star, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
+            Delta_q = (np.eye(self.dim) - VpVpT) @ (sol.y[:, -1] - y_star)
+            Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star, T_star, Delta_q, method=2, epsilon=1e-6) + (sol.y[:, -1] - y_star))
             #_________________________________________________________________#
             """------Step 4: Newton correction------------------------------"""      
             Wp = np.column_stack([
@@ -397,15 +464,15 @@ class orbit:
             d11 = 0
             c1 = self.f(T_star, y_prev)
             s = ((y_star + Delta_q) - y_prev) @ self.f(T_star, y_prev)
-            b1 = Vp.T @ self.f(T_star, phi_T)
+            b1 = Vp.T @ self.f(T_star, sol.y[:, -1])
             # Build augmented linear system [A | b]
             top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
             bottom = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
             Mat = np.vstack((top, bottom))
 
             # Right-hand side (Taylor approx)
-            sol = solve_ivp(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
-                            method='RK45', rtol=1e-7, atol=1e-9)
+            sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
+                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
             r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
             B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
             #________________________________________________________________#
@@ -443,9 +510,9 @@ class orbit:
 
     def Newton_Picard_sub_proj(self, y0, T_0, Max_iter, epsilon, subsp_iter=None, Ve_0 = None, p0=None, pe=None, rho=None):
         """----------Initialization--------"""
-        y_star = y0
-        y_prev = y0
-        T_star = T_0
+        y_star = y0.copy()
+        y_prev = y0.copy()
+        T_star = T_0.copy()
         p = p0
         y_by_iter = np.zeros((Max_iter, self.dim)) 
         T_by_iter = np.zeros(Max_iter)
@@ -454,14 +521,15 @@ class orbit:
         # Newton_time, Picard_time = np.zeros(Max_iter), np.zeros(Max_iter)
         Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
         p = p0
+        I = np.eye(self.dim)
         """----------------Shooting loop---------------------------"""
         for k in range(Max_iter):
             # Step 1: Solve the ODE to get phi(T)
-            phi_interp = solve_ivp(
-                fun=self.f, t_span=[0.0, T_star], t_eval=[T_star],dense_output=True, y0=y_star,
-                method='RK45', rtol=1e-10, atol=1e-12
+            phi_interp = self.ode_solver(
+                fun=self.f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
+                method=self.method, rtol=1e-7, atol=1e-9, jac=self.Jacf, steps = self.solver_steps
             )
-            phi_T = phi_interp.y[:, -1].copy()
+            # phi_T = phi_interp.y[:, -1]
             #________________________________________________________________#
             """------Step 2: Compute dominant subspace via subspace iteration with projection"""
             Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star,rho,p0, pe, subsp_iter, epsilon)
@@ -470,38 +538,40 @@ class orbit:
             #________________________________________________________________#
             """------Step 3: Picard correction (NPGS(l=2))-----------------"""
             # start_Picard = time()
+            MV = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y_star,T_star,v, method = 2, epsilon = 1e-6),
+                             matmat = lambda V : self.monodromy_mult(y_star, T_star, V, method = 2, epsilon = 1e-6))
             VpVpT = Vp @ Vp.T
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star,
-                         T_star, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
-            # Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult2(T_star, Delta_q, phi_interp) + (phi_T - y_star))
+            Delta_q = (I - VpVpT) @ (phi_interp.y[:, -1] - y_star)
+            Delta_q = (I - VpVpT) @ (MV @ Delta_q + (phi_interp.y[:, -1] - y_star))
+            # Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult2(T_star, Delta_q, phi_interp) + (phi_interp.y[:, -1] - y_star))
             # end_Picard = time()
             # Picard_time[k] = end_Picard -start_Picard
 
             #_________________________________________________________________#
             """------Step 4: Newton correction------------------------------"""
             # start_Newton = time()
-            #Wp = M@Vp    
-            Wp = np.column_stack([
-                self.monodromy_mult(y_star, T_star, Vp[:, j], method=2, epsilon=1e-6)
-                # self.monodromy_mult2(T_star, Delta_q, phi_interp)
-                for j in range(p)
-            ])
+            #Wp = M@Vp   
+            Wp = MV @ Vp 
+            # Wp = np.column_stack([
+            #     self.monodromy_mult(y_star, T_star, Vp[:, j], method=2, epsilon=1e-6)
+            #     # self.monodromy_mult2(T_star, Delta_q, phi_interp)
+            #     for j in range(p)
+            # ])
             Sp = Vp.T @ Wp
             # Build linear system
             d11 = 0
             c1 = self.f(T_star, y_prev) #from the orthogonal phase condition
             s = (y_star + Delta_q - y_prev) @ c1
-            b1 = Vp.T @ self.f(T_star, phi_T)
+            b1 = Vp.T @ self.f(T_star, phi_interp.y[:, -1])
 
-            top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
+            top = np.hstack((Sp - I[:p,:p], b1.reshape(-1, 1))) #Je peux utiliser I[:p,:p] a la place de np.eye(p) pour gagner du temps
             #top = np.hstack((Re[:p,:p] - np.eye(p), b1.reshape(-1, 1))) #Converge mais plus lent 
             bottom = np.hstack(((c1.T@Vp).reshape(1,-1),np.array([[d11]])))
             Mat = np.vstack((top, bottom))
             #Right-hand side (B vector)
-            sol = solve_ivp(
-                fun=self.f, t_span=[0.0, T_star], t_eval=[T_star],
-                y0=y_star + Delta_q, method='RK45', rtol=1e-10, atol=1e-12
+            sol = self.ode_solver(fun=self.f, t_span=[0.0, T_star], t_eval=[T_star],
+                y0=y_star + Delta_q, method=self.method, 
+                rtol=1e-7, atol=1e-9, jac = self.Jacf, steps = self.solver_steps
             )
             r_y0_deltaq = sol.y[:, -1] - y_star
             B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
@@ -555,11 +625,11 @@ class orbit:
         """----------------Shooting loop---------------------------"""
         for k in range(Max_iter):
             # Step 1: Solve the ODE to get phi(T)
-            sol = solve_ivp(
+            sol = self.ode_solver(
                 fun=f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
-                method='RK45', rtol=1e-7, atol=1e-9
+                method=self.method, rtol=1e-7, atol=1e-9, jac=Jacf, steps = self.solver_steps
             )
-            phi_T = sol.y[:, -1].copy()
+            # phi_T = sol.y[:, -1].copy()
             #________________________________________________________________#
             """------Step 2: Compute dominant subspace via subspace iteration with projection"""
             Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star, f, Jacf, rho, p0, pe, subsp_iter, epsilon)
@@ -591,9 +661,9 @@ class orbit:
             """------Step 3: Picard correction (NPGS(l=2))-----------------"""
             # start_Picard = time()
             VpVpT = Vp @ Vp.T
-            Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
+            Delta_q = (np.eye(self.dim) - VpVpT) @ (sol.y[:, -1] - y_star)
             Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star,
-             T_star, f, Jacf, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
+             T_star, f, Jacf, Delta_q, method=2, epsilon=1e-6) + (sol.y[:, -1] - y_star))
             # end_Picard = time()
             # Picard_time[k] = end_Picard -start_Picard
 
@@ -610,16 +680,16 @@ class orbit:
             d11 = 0
             c1 = f(T_star, y_prev) #from the orthogonal phase condition
             s = (y_star + Delta_q - y_prev) @ c1
-            b1 = Vp.T @ f(T_star, phi_T)
+            b1 = Vp.T @ f(T_star, sol.y[:, -1])
 
             top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
             #top = np.hstack((Re[:p,:p] - np.eye(p), b1.reshape(-1, 1))) #Converge mais plus lent 
             bottom = np.hstack(((c1.T@Vp).reshape(1,-1),np.array([[d11]])))
             Mat = np.vstack((top, bottom))
             #Right-hand side (B vector)
-            sol = solve_ivp(
+            sol = self.ode_solver(
                 fun=f, t_span=[0.0, T_star], t_eval=[T_star],
-                y0=y_star + Delta_q, method='RK45', rtol=1e-7, atol=1e-9
+                y0=y_star + Delta_q, method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps, jac=Jacf 
             )
             r_y0_deltaq = sol.y[:, -1] - y_star
             B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
@@ -856,94 +926,144 @@ class optim_BrusselatorModel:
         
         J_sparse = sp.sparse.bmat([[Jxx,diag_XX],
                     [Jxy,Jyy]])
-        return J_sparse
-
-
-
-
+        return J_sparse                                                                     
+    
 def call_method(method, **kwargs):
     from inspect import signature
 
-    # Récupère les paramètres attendus par la méthode
+    # Récupere les parametres attendus par la methode
     sig = signature(method)
     valid_args = {k: v for k, v in kwargs.items() if k in sig.parameters}
 
     return method(**valid_args)
 
 
-# def run(model,n_z,p0,pe,rho, subsp_iter,orbit_method):
-#     df = pd.DataFrame()
-#     model.n_z = n_z
-#     f = model.dydt
-#     Jacf = model.brusselator_jacobian
-#     #Initialization
-#     X0 = model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
-#     Y0 = model.B/model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
-#     y0 = np.concatenate([X0[1:-1],Y0[1:-1]])
-#     #We integrate sufficiently the equation to find a good starting point
-#     phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
-#                 t_eval=[16*model.T_ini],
-#                 dense_output=True,
-#                 y0=y0, method='RK45', 
-#                 **{"rtol": 1e-10,"atol":1e-12}
-#                 )
-    
-#     y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
-#     orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, Max_iter, epsilon)
-#     #Using the real part of the eigenvectors fo M(y_T,T0)
-#     #May be expensive in large dimension 
-#     # We may leverage in the fact that only the action of M is required while computing eigenvector rather than computing expicitely M
-#     # _,M = orbit_finder.integ_monodromy(y_T,model.T_ini)
-#     # _, eigvec = np.linalg.eig(M)
-#     # V_0 = np.real(eigvec[:,:p0+pe])
-#     # V_0,_ = np.linalg.qr(V_0)
-#     # _,V_0 = orbit_finder.base_Vp(np.eye(len(y_T))[0], y_T, model.T_ini, f, Jacf, p0+pe, epsilon)
-    
-#     V_0 = orbit_finder.subspace_iter(y_T,Ve_ini = np.eye(len(y_T))[:,:p0+pe],
-#                                  T =  model.T_ini,
-#                                  phi_t = phi_t,
-#                                  p0 = p0,
-#                                  pe = pe,
-#                                  max_iter = subsp_iter
-#                                  )
-#     args = {
-#     "y0": y_T,
-#     "T_0": model.T_ini,
-#     "Max_iter": Max_iter,
-#     "epsilon": epsilon,
-#     "subsp_iter": subsp_iter,
-#     "Ve_0": V_0,
-#     "p0": p0,
-#     "pe": pe,
-#     "rho": rho,
-#     "phase_cond": 2}
-#     method_to_call = getattr(orbit_finder, orbit_method)
 
-#     start = time.time()
-#     k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args)
-                         
-#     end = time.time()
-#     # p0 = p0+2 #We may vary p accordingly to n_z rather than fixing it
-#     results = dict(
-#         orbit_method = orbit_method,
-#         nz = n_z,
-#         p0 = p0,
-#         pe=pe,
-#         sub_sp_iter = subsp_iter,
-#         rho = rho,
-#         n_iter = k,
-#         precison = f"{epsilon:.1e}",
-#         n_ivp_solves = (subsp_iter*(p0+pe) + 1)*k,
-#         comput_time = float(f"{end-start:.5f}"),
-#         T_star = float(f"{T_by_iter[k-1]:.5f}"),
-#     )
-#     res = pd.DataFrame(results, index=[0])
-#     df = pd.concat([df,res])
-#     df.reset_index(drop=True)
-#     return df
-# n_z=30
-# p0, pe = 5 ,2
-# subsp_iter = 5
-# rho = 0.5
-# orbit_method = "Newton_Picard_simple"
-# res = run(n_z,p0,pe, rho,subsp_iter, orbit_method)
+def my_solve_ivp(fun,t_span,y0,t_eval=None, method='RK45', rtol=1e-7, atol=1e-9, jac=None, steps = 100):
+    """
+    Fixed-step RK4 ODE solver (non-adaptive).
+    Returns a dict similar to solve_ivp with method='RK45'.
+    """
+    if method != 'RK45':
+        raise ValueError(f"Method {method} is not implemented.")
+
+    y0 = np.array(y0, dtype=float)
+    t0, tf = t_span
+    if t_eval is None:
+        t_eval = np.linspace(t0, tf, steps + 1)
+    else:
+        t_eval = np.sort(np.array(t_eval))
+    h = (tf - t0) / steps
+    y = y0.copy()
+    t = t0
+    ys = [y.copy()]
+    ts = [t0]
+    eval_idx = 1  # Next t_eval index
+
+    for step in range(steps):
+        k1 = fun(t, y)
+        k2 = fun(t + h/2, y + h/2 * k1)
+        k3 = fun(t + h/2, y + h/2 * k2)
+        k4 = fun(t + h, y + h * k3)
+        y_new = y + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
+        t_new = t + h
+
+        # # Store values at t_eval points (linear interpolation if needed)
+        # while eval_idx < len(t_eval) and t < t_eval[eval_idx] <= t_new:
+        #     frac = (t_eval[eval_idx] - t) / h
+        #     y_interp = y + frac * (y_new - y)
+        #     ys.append(y_interp.copy())
+        #     ts.append(t_eval[eval_idx])
+        #     eval_idx += 1
+
+        y = y_new
+        t = t_new
+        
+    y_out = np.stack(ys, axis=1)
+    t_out = np.array(ts)
+    # Mimic OdeSolution
+    result = SimpleNamespace(
+        t=t_out,
+        y=y_out,
+        t_events=None,
+        y_events=None,
+        status=0,
+        message="Success",
+    )
+    return result
+
+def imp_trapz(fun, y0, t_span, t_eval=None, method = 'imp_trpz',rtol = 1e-7, atol= 1e-9,jac=None, steps=100, newton_tol=1e-9, newton_maxiter=10):
+    """
+    Implicit 2-stage Runge-Kutta (trapezoidal rule / Crank-Nicolson) for ODEs.
+    Supports sparse CSR Jacobian.
+    y_{n+1} = y_n + (h/2) * [f(t_n, y_n) + f(t_{n+1}, y_{n+1})]
+    """
+    y0 = np.array(y0, dtype=float)
+    t0, tf = t_span
+    if t_eval is None:
+        t_eval = np.linspace(t0, tf, steps + 1)
+    else:
+        t_eval = np.sort(np.array(t_eval))
+    h = (tf - t0) / steps
+    y = y0.copy()
+    t = t0
+    ys = [y.copy()]
+    ts = [t0]
+    eval_idx = 1
+    I = sp.sparse.eye(len(y0), format='csr')  # Identity matrix for Jacobian
+    for step in range(steps):
+        t_new = t + h
+        f_n = fun(t, y)
+        # Newton's method for implicit solve
+        y_guess = y + h * f_n  # Euler prediction
+        for _ in range(newton_maxiter):
+            F = y_guess - y - (h/2) * (f_n + fun(t_new, y_guess))
+            if jac is not None:
+                J = I- (h/2) * jac(t_new, y_guess)
+                delta = sp.sparse.linalg.spsolve(J, -F)
+            else:
+                # Dense finite-difference Jacobian
+                eps = 1e-8
+                J = np.eye(len(y))
+                f_guess = fun(t_new, y_guess)
+                for i in range(len(y)):
+                    y_fd = y_guess.copy()
+                    y_fd[i] += eps
+                    f_fd = fun(t_new, y_fd)
+                    J[:, i] = (y_fd - y - (h/2)*(f_n + f_fd) - F) / eps
+                delta = np.linalg.solve(J, -F)
+            y_guess += delta
+            if np.linalg.norm(delta) < newton_tol:
+                break
+        y_new = y_guess
+
+        # Store values at t_eval points (linear interpolation if needed)
+        while eval_idx < len(t_eval) and t < t_eval[eval_idx] <= t_new:
+            frac = (t_eval[eval_idx] - t) / h
+            y_interp = y + frac * (y_new - y)
+            ys.append(y_interp.copy())
+            ts.append(t_eval[eval_idx])
+            eval_idx += 1
+
+        y = y_new
+        t = t_new
+
+    y_out = np.stack(ys, axis=1)
+    t_out = np.array(ts)
+    result = SimpleNamespace(
+        t=t_out,
+        y=y_out,
+        t_events=None,
+        y_events=None,
+        status=0,
+        message="Success",
+    )
+    return result
+
+def to_banded(A_sparse, l, u):
+    """Convert sparse matrix to banded form compatible with scipy.linalg.solve_banded."""
+    n = A_sparse.shape[0]
+    ab = np.zeros((l + u + 1, n))
+    for diag in range(-l, u+1):
+        ab[u - diag, max(0, -diag):n - max(0, diag)] = A_sparse.diagonal(diag)
+    return ab
