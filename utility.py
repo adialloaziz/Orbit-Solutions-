@@ -40,7 +40,7 @@ def eig_quasi_upper(T):
   
 
 class orbit:
-    def __init__(self, f,y0,T_0, Jacf,phase_cond, ode_solver,method,solver_steps, Max_iter, epsilon):
+    def __init__(self, f,y0,T_0, Jacf,phase_cond=2, ode_solver=solve_ivp,method="RK45",solver_steps=None, Max_iter=1, epsilon=1e-6):
         self.dim = np.shape(y0)[0] #The problem dimension
         self.f = f
         self.y0 = y0
@@ -52,7 +52,7 @@ class orbit:
         self.solver_steps = solver_steps
         self.Max_iter = Max_iter
         self.epsilon = epsilon
-        # self.method = Newton_orbit
+    # def read_params(self, filename):
     def big_system(self,t, Y_M):
         # Solving numerically the initial value problem (dy/dt,dM/dt = (f(t,y),Jacf*M) 
         M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
@@ -171,8 +171,8 @@ class orbit:
         tol: float = None
         ):   
         Ve = Ve_ini.copy()
-        M = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y,T,v, method = 2, epsilon = 1e-6),
-                             matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
+        # M = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y,T,v, method = 2, epsilon = 1e-6),
+                            #  matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
         k = 0
         convergence = False
         for k in range(max_iter):
@@ -182,7 +182,8 @@ class orbit:
             #     self.monodromy_mult(y, T, Ve[:, j], method=2, epsilon=1e-6)
             #     for j in range(p0 + pe)
             # ])
-            We = M @ Ve
+            # We = M.matmat(Ve)
+            We = self.monodromy_mult(y, T, Ve, method=2, epsilon=1e-6)
             # We = self.monodromy_mult(y, T, Ve, method = 2, epsilon = 1e-6)
             # Project back onto the current subspace (basic projection step)
             Se = Ve.T @ We
@@ -243,7 +244,7 @@ class orbit:
         
         eigenval, Vp = eigs(Mv, k=p, which = 'LM', v0 = v0)#,maxiter=100)
         return eigenval, Vp   
-    def picard_correction(self, y, T,r, Vp):
+    def picard_correction(self, y, T,r, Vp,l):
         """
         Perform Picard correction for the orbit finding method.
         Args:
@@ -251,6 +252,7 @@ class orbit:
             T: Time period.
             r: The residual phi_T - y.
             Vp: Basis vectors for the subspace.
+            l: The number of Picard iterations.
             
         Returns:
             Delta_q: Corrected state vector after Picard iteration Del.
@@ -258,15 +260,61 @@ class orbit:
         I = np.eye(self.dim)
         Delta_q = np.zeros(self.dim)
 
-        M = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y,T,v, method = 2, epsilon = 1e-6),
-                             matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
+        # M = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult_matvec(y,T,v, method = 2, epsilon = 1e-6),
+                            #  matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
         # VpVpT = Vp @ Vp.T
 
         Q = I - Vp @ Vp.T
-        for i in range(self.l):
-            Delta_q = Q @ (M @ Delta_q + r)
-        return Delta_q
 
+        for i in range(1,l):
+
+            # Delta_q = Q @ (M @ Delta_q + r)
+            Delta_q = Q @ (self.monodromy_mult_matvec(y, T, Delta_q, method=2, epsilon=1e-6) + r)
+        return Delta_q
+    def newton_correction(self, y,phi_T, T, Vp, Wp, Delta_q, y_prev):
+        """
+        Perform Newton correction for the orbit finding method.
+        Args:
+            y: Current state vector.
+            phi_T: Solution at time T.
+            T: Time period.
+            Vp: Basis vectors for the subspace.
+            Wp: Monodromy matrix applied to Vp (from the last iteration of the subspace iteration).
+            Delta_q: Picard correction vector.
+            y_prev: Previous state vector for phase condition.
+            
+        Returns:
+            Delta_p: Corrected state vector in the dominant subspace after Newton iteration.
+            Delta_T: Corrected time period.
+            B: Right-hand side of the linear system.
+        """
+        
+        Sp = Vp.T @ Wp
+        # Phase condition
+        d11 = 0
+        c1 = self.f(T, y_prev)
+        s = (y + Delta_q - y_prev) @ c1
+        b1 = Vp.T @ self.f(T, phi_T)
+        # Build augmented linear system [A | b]
+        top = np.hstack((Sp - np.eye(Vp.shape[1]), b1.reshape(-1, 1)))
+        bottom = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
+        Mat = np.vstack((top, bottom))
+
+        # Right-hand side (Taylor approx) 
+        sol = self.ode_solver(fun=self.f, t_span=[0.0, T], y0=y + Delta_q,
+                              t_eval=[T], method=self.method,
+                              rtol=1e-7, atol=1e-9, steps=self.solver_steps)
+        
+        r_y0_deltaq = sol.y[:, -1] - y
+        B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
+        
+        XX = solve(Mat, -B)
+        Delta_p = Vp @ XX[:Vp.shape[1]] 
+        Delta_T = XX[-1]
+
+
+        
+        return Delta_p, Delta_T, B
 
     def integ_monodromy(self,y0,M0, T):
         # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
@@ -342,7 +390,7 @@ class orbit:
 
         return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
 
-    def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=None, Ve_0 = None, p0=None, pe=None, rho=None):
+    def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5):
         """----------Initialization--------"""
         y_star = y0
         y_prev = y0
@@ -533,7 +581,7 @@ class orbit:
 
         return k, T_by_iter, y_by_iter, Norm_B, Norm_DeltaY
 
-    def Newton_Picard_sub_proj(self, y0, T_0, Max_iter, epsilon, subsp_iter=None, Ve_0 = None, p0=None, pe=None, rho=None):
+    def Newton_Picard_sub_proj(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2):
         """----------Initialization--------"""
         y_star = y0.copy()
         y_prev = y0.copy()
@@ -543,7 +591,6 @@ class orbit:
         T_by_iter = np.zeros(Max_iter)
         Norm_B = np.zeros(Max_iter)
         Norm_Deltay = np.zeros(Max_iter)
-        # Newton_time, Picard_time = np.zeros(Max_iter), np.zeros(Max_iter)
         Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
         p = p0
         I = np.eye(self.dim)
@@ -563,43 +610,18 @@ class orbit:
             #________________________________________________________________#
             """------Step 3: Picard correction (NPGS(l=2))-----------------"""
 
-            Delta_q = self.picard_correction(y = y_star,T = T_star,r = phi_T-y_star, Vp=Vp, l=2)
+            Delta_q = self.picard_correction(y = y_star,T = T_star,r = phi_T-y_star, Vp=Vp,l=l)
             
-
             #_________________________________________________________________#
             """------Step 4: Newton correction------------------------------"""
             # Wp = M @ Vp 
             Wp = We[:,:p]
-            # Wp = np.column_stack([
-            #     self.monodromy_mult(y_star, T_star, Vp[:, j], method=2, epsilon=1e-6)
-            #     # self.monodromy_mult2(T_star, Delta_q, phi_interp)
-            #     for j in range(p)
-            # ])
-            Sp = Vp.T @ Wp
-            # Build linear system
-            d11 = 0
-            c1 = self.f(T_star, y_prev) #from the orthogonal phase condition
-            s = (y_star + Delta_q - y_prev) @ c1
-            b1 = Vp.T @ self.f(T_star, phi_interp.y[:, -1])
-
-            top = np.hstack((Sp - I[:p,:p], b1.reshape(-1, 1))) #Je peux utiliser I[:p,:p] a la place de np.eye(p) pour gagner du temps
-            #top = np.hstack((Re[:p,:p] - np.eye(p), b1.reshape(-1, 1))) #Converge mais plus lent 
-            bottom = np.hstack(((c1.T@Vp).reshape(1,-1),np.array([[d11]])))
-            Mat = np.vstack((top, bottom))
-            #Right-hand side (B vector)
-            sol = self.ode_solver(fun=self.f, t_span=[0.0, T_star], t_eval=[T_star],
-                y0=y_star + Delta_q, method=self.method, 
-                rtol=1e-7, atol=1e-9, jac = self.Jacf, steps = self.solver_steps
+            Delta_p , Delta_T, B = self.newton_correction(
+                y = y_star, phi_T=phi_T ,T = T_star, Vp = Vp, Wp = Wp, 
+                Delta_q = Delta_q, y_prev = y_prev
             )
-            r_y0_deltaq = sol.y[:, -1] - y_star
-            B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
-            #________________________________________________________________#
-            """-----Step 5: Solve linear system for Delta_p (Delta_y = Delta_q + Vp @ Delta_p) and Delta_T"""
-            XX = solve(Mat, -B)
-            # end_Newton = time()
-            # Newton_time[k] = end_Newton-start_Newton
-            Delta_y = Delta_q + Vp @ XX[:p]
-            Delta_T = XX[-1]
+    
+            Delta_y = Delta_q + Delta_p
             #________________________________________________________________#
             """------Step 6: Update guess----------------------------------"""
             y_prev = y_star
@@ -613,7 +635,7 @@ class orbit:
             Norm_B[k] = np.linalg.norm(B)
             print(f"Iteration {k}:$||\Delta y ||$ = {Norm_Deltay[k]:.3e}, T = {T_star:.5f}, p = {p}")
             print(f"$||\Delta q ||$ = {np.linalg.norm(Delta_q):.3e}")
-            print(f"$||\Delata p || $= {np.linalg.norm(Vp @ XX[:p]):.3e}")
+            print(f"$||\Delata p || $= {np.linalg.norm(Delta_p):.3e}")
             if Norm_Deltay[k] <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
                 converged = 1
@@ -621,9 +643,8 @@ class orbit:
             else: 
                 converged = 0
         # Final monodromy matrix computation
-        # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
-
-        return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay#, Newton_time, Picard_time
+        # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
+        return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
 
     # def NP_project_anim(self, f, y0, T_0, Ve_0, p0, pe, rho, Jacf, Max_iter, subsp_iter, epsilon):
     #     """----------Initialization--------"""
@@ -804,7 +825,7 @@ class BrusselatorModel:
                     elif var == 'rho':
                         self.rho = float(res)
                     elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
-                        self.l = int(res)
+                        self.picard_iter = int(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                 
@@ -918,6 +939,8 @@ class optim_BrusselatorModel:
                         self.pe = int(res)
                     elif var == 'rho':
                         self.rho = float(res)
+                    elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
+                        self.picard_iter = int(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                 

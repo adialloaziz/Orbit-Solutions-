@@ -12,7 +12,8 @@ precision=1e-9
 #precision=1e-12
 #precision=1e-9 pour le test du temps de calcul en fonction de n-z
 out_dir=./Results/brusslator/
-#PARAMETERS FOR NEWTON-PICARD Method
+Max_iter=7
+#PARMETERS FOR NEWTON-PICARD Method
 rho=0.5
 picard_iter=2
 subsp_iter=5
