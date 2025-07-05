@@ -74,15 +74,13 @@ class orbit:
                             t_eval=[T], 
                             y0=y, method=self.method, 
                             **{"rtol": 1e-7,"atol":1e-9},
-                            steps = 1000,
                             )
             phi_0_T = sol.y[:,-1]
             sol1 = self.ode_solver(fun=self.f,t_span=[0.0, T],
                             t_eval=[T], 
                             y0=y + epsilon*v, method=self.method, 
                             **{"rtol": 1e-7,"atol":1e-9},
-                            steps = 1000,
-                            )
+                             )
             phi_v_T = sol1.y[:,-1]
 
             Mv = (phi_v_T - phi_0_T)/epsilon
@@ -97,7 +95,7 @@ class orbit:
             V_flat = v.flatten(order ='F') 
             y_v0 = np.concatenate([y, V_flat])
             sol_mv = self.ode_solver(fun = Mv_system, y0 = y_v0, t_span=[0.0,T], t_eval=[T],method=self.method, 
-                            **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
+                            **{"rtol": 1e-7,"atol":1e-9})
             Mv = sol_mv.y[self.dim:,-1]
             # Mv = Mv.reshape((self.dim, v.shape[1]), order = 'F') #To be defined as a LinearOperator
             Mv = Mv.reshape((self.dim, -1), order='F')
@@ -106,6 +104,7 @@ class orbit:
             sys.exit(1)
 
         return Mv
+
     def monodromy_mult_matvec(self,y, T, v, method = 1, epsilon = 1e-6):
             
 
@@ -117,7 +116,7 @@ class orbit:
          
         y_v0 = np.concatenate([y, v])
         sol_mv = self.ode_solver(fun = Mv_system, y0 = y_v0, t_span=[0.0,T], t_eval=[T],method=self.method, 
-                        **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
+                        **{"rtol": 1e-7,"atol":1e-9})
         Mv = sol_mv.y[self.dim:,-1]
 
         return Mv
@@ -134,7 +133,7 @@ class orbit:
 
         sol_mv = self.ode_solver(fun = lambda t,Mv: Mv_system(t,Mv, phi_t), y0 = v, t_span=[0.0,T],
                 t_eval=[T],method=self.method, 
-                **{"rtol": 1e-7,"atol":1e-9}, steps = 1000)
+                **{"rtol": 1e-7,"atol":1e-9})
         Mv = sol_mv.y[:,-1] #To be defined as a LinearOperator
         return Mv
 
@@ -303,7 +302,7 @@ class orbit:
         # Right-hand side (Taylor approx) 
         sol = self.ode_solver(fun=self.f, t_span=[0.0, T], y0=y + Delta_q,
                               t_eval=[T], method=self.method,
-                              rtol=1e-7, atol=1e-9, steps=self.solver_steps)
+                              rtol=1e-7, atol=1e-9)
         
         r_y0_deltaq = sol.y[:, -1] - y
         B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s])))
@@ -326,7 +325,7 @@ class orbit:
         big_sol= self.ode_solver(fun = self.big_system, t_span= (0.0,T),y0=Y_M,
                             t_eval=[T],
                             method=self.method,
-                            rtol = 1e-7, atol = 1e-9, steps = self.solver_steps) #It's a function of t
+                            rtol = 1e-7, atol = 1e-9) #It's a function of t
         
         # phi_T = big_sol.y[:self.dim,-1]
         monodromy = big_sol.y[self.dim:][:,-1] #We take M(T)
@@ -347,6 +346,7 @@ class orbit:
             phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
 
         #Selecting the phase-condition
+        #To be taken out of the loop
             if (phase_cond == 1 ): #Imposing a maximum or minimum on a component of y at t = 0 
                 d = 0
                 c = self.Jacf(T_star,y_star)[0,:] 
@@ -407,7 +407,7 @@ class orbit:
             phi_interp = self.ode_solver(fun = self.f, t_span = [0.0, T_star], y0 = y_star,
                                           t_eval=[T_star],
                             dense_output=False, #Return a continuous solution if set to true
-                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
+                            method=self.method, rtol=1e-7, atol=1e-9)
             
             # phi_t = interp1d(sol.t, sol.y, kind='cubic', fill_value="extrapolate") #Interpolating the solution to use it in the variational formulation
             phi_T = phi_interp.y[:, -1]
@@ -451,7 +451,7 @@ class orbit:
 
             # Right-hand side (Taylor approx)
             sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
-                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
+                            method=self.method, rtol=1e-7, atol=1e-9)
             r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
             B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
             #________________________________________________________________#
@@ -502,7 +502,7 @@ class orbit:
         for k in range(Max_iter):
             """------Step1: Integrate up to T_star to get phi_T"""
             sol = self.ode_solver(self.f, [0.0, T_star], y_star, t_eval=[T_star],
-                            method=self.method, rtol=1e-7, atol=1e-9, steps=self.solver_steps)
+                            method=self.method, rtol=1e-7, atol=1e-9)
             # phi_T = sol.y[:, -1]
             """------Step 2: Compute dominant subspace via the IRAM method"""
             eigenvals, Ve = self.base_Vp(v0, y_star, T_star, p + pe, epsilon)
@@ -545,7 +545,7 @@ class orbit:
 
             # Right-hand side (Taylor approx)
             sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
-                            method=self.method, rtol=1e-7, atol=1e-9, steps = self.solver_steps)
+                            method=self.method, rtol=1e-7, atol=1e-9)
             r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
             B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
             #________________________________________________________________#
@@ -599,7 +599,7 @@ class orbit:
             # Step 1: Solve the ODE to get phi(T)
             phi_interp = self.ode_solver(
                 fun=self.f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
-                method=self.method, rtol=1e-7, atol=1e-9, jac=self.Jacf, steps = self.solver_steps
+                method=self.method, rtol=1e-7, atol=1e-9, jac=self.Jacf
             )
             phi_T = phi_interp.y[:, -1].copy()
             #________________________________________________________________#
@@ -952,7 +952,7 @@ class optim_BrusselatorModel:
                     sys.exit(1)
         
 
-    
+    #Try jax for the Laplacian
     def Lap_mat(self): 
         """
             Sparse Laplacian Matrix from the finite difference discretization of the Brusselator model.

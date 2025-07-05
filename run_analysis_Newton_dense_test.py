@@ -100,22 +100,6 @@ def safe_run(model,n_z,orbit_method):
         print(f"Error running {orbit_method} with n_z={n_z}: {e}")
         return f"{n_z}, Error: {e}\n", None
 
-def append_results_to_file(lines, filename):
-    with open(filename, 'a') as f:
-        f.writelines(lines)
-
-# ---- Load processed inputs from txt file ----
-def load_done_inputs(filename):
-    if not os.path.exists(filename):
-        return set()
-    done = set()
-    with open(filename, 'r') as f:
-        for line in f:
-            if line.strip():  # skip empty lines
-                input_str = line.split(',')[0]
-                done.add(int(input_str))
-    return done
-
 # ---- Main execution block ----
 if __name__ == "__main__":
 
@@ -137,16 +121,11 @@ if __name__ == "__main__":
                 Must be provided if not using the default parameter file 'bruss_dflt_params.in'."""
                       )
     parser.add_argument(
-                    "-k_dim","--k_dim", type=int, default = 1,
-                    help="""The number of gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
-                            Default is 1 """
+                    "-n_z","--n_z", type=int, default = 16,
+                    help="""The gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
+                            Default is 16 """
                       )
-    parser.add_argument(
-                    "-NUM_CORES","--ncores", type=int, default = 1,
-                    help="""The number of cpus cores to use in the parallel loops.
-                            Default is 1 (Sequential run)"""
-                      )
-    
+
     args = parser.parse_args()
     BASE_PATH = Path().parent.resolve()
     # file = "brusselator_params_%i.in" %args.n_file
@@ -165,33 +144,13 @@ if __name__ == "__main__":
     Dir_path.mkdir(parents=True, exist_ok=True)
 
     orbit_method = "Newton_orbit"
-    dim_nz = 2 ** np.arange(4,4+args.k_dim)
-    checkpoint_file = f'{Dir_path}/checkpoint_Newton_dense.txt'
-    batch_size = 1
-    inputs = dim_nz
-    # ---- Load previously completed inputs ----
-    done_inputs = load_done_inputs(checkpoint_file)
-    remaining_inputs = [x for x in inputs if x not in done_inputs]
 
-    print('N_cores', args.ncores)
+    # ---- Load previously completed inputs ----
+
         
     print("Runing method: Newton with dense Jac.........\n")
-    all_results = []
-    for i in range(0, len(remaining_inputs), batch_size):
-        batch = remaining_inputs[i:i+batch_size]
 
-        res = Parallel(n_jobs=args.ncores,backend="multiprocessing",
-                    prefer='processes')(delayed(safe_run)(model,n_z,orbit_method) for n_z in inputs)
-        batch_results = res[i][0]
-        print("res", res[i][0])
-
-
-        all_results.append(res[i][1])  # Collect results from the first element of each batch
-        append_results_to_file(batch_results, checkpoint_file)
-        # log progress every N batches
-        if i % (batch_size * 2) == 0:
-            print(f"[INFO] Processed {i + len(batch)} / {len(remaining_inputs)} inputs")
-    
+    res = safe_run(model,args.n_z,orbit_method)
     #Saving the results
     file_path = f"{Dir_path/orbit_method}_dense.txt"
     with open(file_path, 'w') as f:
