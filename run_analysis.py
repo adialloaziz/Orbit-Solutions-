@@ -100,22 +100,6 @@ def safe_run(model,n_z,orbit_method):
         print(f"Error running {orbit_method} with n_z={n_z}: {e}")
         return f"{n_z}, Error: {e}\n", None
 
-def append_results_to_file(lines, filename):
-    with open(filename, 'a') as f:
-        f.writelines(lines)
-
-# ---- Load processed inputs from txt file ----
-def load_done_inputs(filename):
-    if not os.path.exists(filename):
-        return set()
-    done = set()
-    with open(filename, 'r') as f:
-        for line in f:
-            if line.strip():  # skip empty lines
-                input_str = line.split(',')[0]
-                done.add(int(input_str))
-    return done
-
 # ---- Main execution block ----
 if __name__ == "__main__":
 
@@ -132,30 +116,37 @@ if __name__ == "__main__":
     #                 Default is 2(An stable periodic orbit)"""
     #                   )
     parser.add_argument(
-        "param_file", type=str, nargs='?', default="bruss_dflt_params.in",
+        "-param_file", "--param_file",type=str, nargs='?', default="bruss_dflt_params.in",
         help="""The path to the parameter file containing the model parameters.
                 Must be provided if not using the default parameter file 'bruss_dflt_params.in'."""
                       )
     parser.add_argument(
-                    "-k_dim","--k_dim", type=int, default = 1,
-                    help="""The number of gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
-                            Default is 1 """
+                    "-n_z","--n_z", type=int, default = 16,
+                    help="""The gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
+                            Default is 16 """
                       )
     parser.add_argument(
-                    "-NUM_CORES","--ncores", type=int, default = 1,
-                    help="""The number of cpus cores to use in the parallel loops.
-                            Default is 1 (Sequential run)"""
+                    "-sparse_jac","--sparse_jac", type=bool, default=False,
+                    help="""If True, use sparse jacobian matrix. Default is False (dense jacobian)"""
                       )
-    
+    parser.add_argument(
+                    "-method", "--method",type=str, nargs='?', default="Newton_orbit",
+                    help="""The method to use for the orbit finding. Default is 'Newton_orbit'.
+                            Other options include 'Newton_Picard_subsp_iter'."""
+                      )
     args = parser.parse_args()
     BASE_PATH = Path().parent.resolve()
     # file = "brusselator_params_%i.in" %args.n_file
     param_file = BASE_PATH/args.param_file  #  file containing model parameters
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
     
-    
-    print("Using dense jacobian") #default
-    model = BrusselatorModel(param_file)
+
+    if args.sparse_jac:
+        print("Using sparse jacobian")
+        model = optim_BrusselatorModel(param_file)
+    else:
+        print("Using dense jacobian")
+        model = BrusselatorModel(param_file)
 
     if not(os.path.exists(model.out_dir)): #Create the ouput directory if it doesn't exist
         os.makedirs(model.out_dir)
@@ -164,38 +155,14 @@ if __name__ == "__main__":
     Dir_path = Path(output_root_dir/args.param_file/today_analysis)
     Dir_path.mkdir(parents=True, exist_ok=True)
 
-    orbit_method = "Newton_orbit"
-    dim_nz = 2 ** np.arange(4,4+args.k_dim)
-    checkpoint_file = f'{Dir_path}/checkpoint_Newton_dense.txt'
-    batch_size = 1
-    inputs = dim_nz
-    # ---- Load previously completed inputs ----
-    done_inputs = load_done_inputs(checkpoint_file)
-    remaining_inputs = [x for x in inputs if x not in done_inputs]
-
-    print('N_cores', args.ncores)
+    orbit_method = args.method
         
-    print("Runing method: Newton with dense Jac.........\n")
-    all_results = []
-    for i in range(0, len(remaining_inputs), batch_size):
-        batch = remaining_inputs[i:i+batch_size]
+    # print(f"Runing method: .........\n")
 
-        res = Parallel(n_jobs=args.ncores,backend="multiprocessing",
-                    prefer='processes')(delayed(safe_run)(model,n_z,orbit_method) for n_z in inputs)
-        batch_results = res[i][0]
-        print("res", res[i][0])
-
-
-        all_results.append(res[i][1])  # Collect results from the first element of each batch
-        append_results_to_file(batch_results, checkpoint_file)
-        # log progress every N batches
-        if i % (batch_size * 2) == 0:
-            print(f"[INFO] Processed {i + len(batch)} / {len(remaining_inputs)} inputs")
-    
+    res = safe_run(model,args.n_z,orbit_method)
     #Saving the results
-    file_path = f"{Dir_path/orbit_method}_dense.txt"
+    file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'w') as f:
         for item in res:
             f.write(str(item) + '\n')
-
     print("Analysis done")
