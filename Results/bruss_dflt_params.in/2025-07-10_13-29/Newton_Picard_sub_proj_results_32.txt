@@ -1,0 +1,12 @@
+orbit_method: Newton_Picard_sub_proj
+nz: 32
+p0: 5
+pe: 4
+sub_sp_iter: 5
+rho: 0.5
+n_iter: 6
+precison: 0.003993992945719086
+solver_time: 387.994955812
+solver_calls: 56
+comput_time: 388.235521957
+T_star: 3.4330818388514395

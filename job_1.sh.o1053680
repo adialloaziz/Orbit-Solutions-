@@ -1,0 +1,23 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| https://wikis.univ-lille.fr/phlam-hpc/                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| cnodes           : to list the status of all nodes                                |
+| cnodes -f        : to check for free nodes                                        |
+| checkjob <jobid> : to check the status of your job (especially when not running ! |
+| showstart <jobid>: to check when your job is expected to start when not running ! |
+| cdjob <jobid>    : to move to the <jobid> directory                               |
+| cdtmp <jobid>    : to move to the <jobid> working directory on node               |
+| rmtmp <jobid>    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Using existing environment
+I am here

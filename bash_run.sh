@@ -35,27 +35,30 @@ fi
 
 methods=("Newton_Picard_sub_proj" "Newton_orbit")
 #file_params=("" "")
-k_dim=7
-jobid=0
+Nz=(16 32 64 128 256 512 1024)
+#jobid=0
 for method in "${methods[@]}"; do
-cat > job_$jobid.sh <<EOF
+    for nz in "${Nz[@]}"; do
+        cat > job_${method}_nz_${nz}.sh <<EOF
 #!/bin/bash 
 #PBS -S /bin/bash
-#PBS -N run_method_dense_$method
+#PBS -N run_sparse_${method}_${nz}
 #PBS -M diallo
-#PBS -l nodes=1:ppn=$k_dim
-##PBS -l walltime=0:02:00
+#PBS -l nodes=1:ppn=4
+#PBS -l walltime=100:00:00
 # #PBS -t 0-3 #To subimit the job as an array job, uncomment this line.
 #PBS -m bea
-#PBS -o logs/$method_dense.out
-#PBS -e logs/$method_dense.err
+#PBS -o logs/${method}_sparse_nz_${nz}.out
+#PBS -e logs/$method_sparse_nz_$nz.err
 #PBS -V
 #PBS -q plong
 cd $DIR
-$DIR/.myvenv/bin/python3 $DIR/run_analysis_parallel.py -k_dim=$k_dim -method=$method
+$DIR/.myvenv/bin/python3 $DIR/run_analysis.py -n_z=$nz -method=$method -sparse_jac=1
 EOF
-   #submit the job script
-   qsub job_$jobid.sh
-   echo "Submitted job script: job_script_$jobid.sh"
-   ((jobid++))
+       #submit the job script
+       qsub job_${method}_nz_${nz}.sh
+       echo "Submitted job script: job_script_${method}_nz_${nz}.sh"
+       #sleep 10
+       #((jobid++))
+   done
 done

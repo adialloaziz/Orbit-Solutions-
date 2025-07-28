@@ -67,7 +67,7 @@ def run(model,n_z,orbit_method):
     for func, stat in p.stats.items():
         if func[2] == orbit_method:
             total_time = stat[3]  # stat[2] is the total time spent in this function
-            print(f"Total time in {orbit_method}: {total_time:.6f} seconds")
+            print(f"Total time in {orbit_method} with grid size {n_z}: {total_time:.4f} seconds")
             found_stat = True           
         if func[2] == orbit_finder.ode_solver.__name__:
             ivp_time = stat[3]
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     param_file = BASE_PATH/args.param_file  #  file containing model parameters
     today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
     
-    if args.sparse_jac==True:
+    if args.sparse_jac==1:
         print("Using sparse jacobian")
         model = optim_BrusselatorModel(param_file)
     else:
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     orbit_method = args.method
     dim_nz = 2 ** np.arange(4,4+args.k_dim)
     checkpoint_file = f'{Dir_path}/checkpoint_{orbit_method}.txt'
-    batch_size = 1
+    batch_size = args.k_dim
     inputs = dim_nz
     # ---- Load previously completed inputs ----
     done_inputs = load_done_inputs(checkpoint_file)
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     else:
         print(f"[INFO] Using {N_cores} cores for parallel processing.")
         
-    all_results = []
+   # all_results = []
     for i in range(0, len(remaining_inputs), batch_size):
         batch = remaining_inputs[i:i+batch_size]
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         batch_results = res[i][0]
 
 
-        all_results.append(res[i][1])  # Collect results from the first element of each batch
+        #all_results.append(res[i][1])  # Collect results from the first element of each batch
         append_results_to_file(batch_results, checkpoint_file)
         # log progress every N batches
         if i % (batch_size * 2) == 0:
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     #Saving the results
     file_path = f"{Dir_path/orbit_method}.txt"
     with open(file_path, 'a') as f:
-        for item in all_results:
+        for item in res:
             f.write(str(item) + '\n')
 
     print("Analysis done")
