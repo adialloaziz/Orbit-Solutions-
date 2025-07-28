@@ -1,0 +1,21 @@
+num_test=2
+D=1
+I=1
+xmin=-15.0
+xmax=15.0
+scal=1 
+n_z=50
+T_ini=100
+precision=1e-9
+out_dir=./Results/mckean_vlasov/
+Max_iter=7
+#PARMETERS FOR NEWTON-PICARD Method
+rho=0.5
+picard_iter=2
+subsp_iter=5
+p0=5
+pe=4
+#if fixed time step solver
+solver_steps=100
+#X_ini=A+0.1*sin(pi*(z/z_L))
+#Y_ini=B/A+0.1*sin(pi*(z/z_L))
