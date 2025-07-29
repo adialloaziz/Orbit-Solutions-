@@ -3,7 +3,7 @@ from scipy.integrate import solve_ivp
 from utility import orbit, BrusselatorModel, optim_BrusselatorModel,call_method
 from pathlib import Path
 import argparse, time, os
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
 from datetime import datetime
 import cProfile
 import pstats
@@ -16,7 +16,7 @@ def wrapper(*args, **kwargs):
 
 def run(model,n_z,orbit_method):
     global results
-    print('Running method %s with n_z = %i \n' % (orbit_method, n_z))
+    #print('Running method %s with n_z = %i \n' % (orbit_method, n_z))
     epsilon = model.precision
     model.n_z = n_z
     model.Lap = model.Lap_mat() #Upgrade the Laplacian matrix according to the new grid size
@@ -56,7 +56,7 @@ def run(model,n_z,orbit_method):
     "l": model.picard_iter,}
     # method_to_call = getattr(orbit_finder, orbit_method)
 
-    filename = f"{Dir_path/orbit_method}_nz_{n_z}_dense.prof"
+    filename = f"{Dir_path/orbit_method}_nz_{n_z}.prof"
     cProfile.run('wrapper(getattr(orbit_finder, orbit_method),**args_func)',filename)
 
     k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = results
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     BASE_PATH = Path().parent.resolve()
     # file = "brusselator_params_%i.in" %args.n_file
     param_file = BASE_PATH/args.param_file  #  file containing model parameters
-    today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M')
+    today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M_%S')
     
 
     if args.sparse_jac:
@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     res = safe_run(model,args.n_z,orbit_method)
     #Saving the results
-    file_path = f"{Dir_path/orbit_method}.txt"
+    file_path = f"{Dir_path/orbit_method}_{args.n_z}.txt"
     with open(file_path, 'w') as f:
         for item in res:
             f.write(str(item) + '\n')

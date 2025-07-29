@@ -1,0 +1,3 @@
+16,OK
+
+{'orbit_method': 'Newton_Picard_sub_proj', 'nz': 16, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 6, 'precison': 0.005636660650712949, 'solver_time': 69.842872149, 'solver_calls': 56, 'comput_time': 69.86174418200001, 'T_star': 3.4351707747854685}

@@ -1,0 +1,12 @@
+orbit_method: Newton_orbit
+nz: 256
+p0: 5
+pe: 4
+sub_sp_iter: 5
+rho: 0.5
+n_iter: 5
+precison: 1.9798114768559564e-10
+solver_time: 6738.759980121001
+solver_calls: 6
+comput_time: 6769.082206059001
+T_star: 3.4350014212397104

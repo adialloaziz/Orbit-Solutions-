@@ -1,0 +1,3 @@
+16,OK
+
+{'orbit_method': 'Newton_orbit', 'nz': 16, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'rho': 0.5, 'n_iter': 5, 'precison': 5.950596234057825e-15, 'solver_time': 11.813216978000002, 'solver_calls': 6, 'comput_time': 11.890921746, 'T_star': 3.4343403361063807}
