@@ -2,11 +2,10 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from utility import orbit, BrusselatorModel, optim_BrusselatorModel,call_method
 from pathlib import Path
-import argparse, time, os
-#from joblib import Parallel, delayed
+import argparse, os
 from datetime import datetime
 import cProfile
-import pstats
+import pstats, pickle
 
 results = None  # Ensure results is defined at module scope
 def wrapper(*args, **kwargs):
@@ -14,7 +13,7 @@ def wrapper(*args, **kwargs):
     global results
     results = call_method(*args, **kwargs)
 
-def run(model,n_z,orbit_method):
+def run(model,n_z,orbit_method, filename):
     global results
     #print('Running method %s with n_z = %i \n' % (orbit_method, n_z))
     epsilon = model.precision
@@ -53,11 +52,13 @@ def run(model,n_z,orbit_method):
     "pe": model.pe,
     "rho": model.rho,
     "phase_cond": 2,
-    "l": model.picard_iter,}
-    # method_to_call = getattr(orbit_finder, orbit_method)
-
-    filename = f"{Dir_path/orbit_method}_nz_{n_z}.prof"
-    cProfile.run('wrapper(getattr(orbit_finder, orbit_method),**args_func)',filename)
+    "l": model.picard_iter,
+    "full_sub_iter": model.full_sub_iter,  # Use the full subspace iteration if True for the subspace iteration with projection
+    }
+    global method_to_call
+    method_to_call= getattr(orbit_finder, orbit_method)
+    print('method ', method_to_call)
+    cProfile.run('wrapper(method_to_call,**args_func)',filename)
 
     k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = results
     # k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args_func)
@@ -80,6 +81,7 @@ def run(model,n_z,orbit_method):
         p0 = model.p0,
         pe=model.pe,
         sub_sp_iter = model.subsp_iter,
+        full_sub_iter = model.full_sub_iter,
         rho = model.rho,
         n_iter = k,
         precison = Norm_Deltay[k],
@@ -93,16 +95,15 @@ def run(model,n_z,orbit_method):
 
 # ---- Run the orbit finder with error handling ----
 #-----Allows me to track the progress of the run and save results to a file-----
-def safe_run(model,n_z,orbit_method):
+def safe_run(model,n_z,orbit_method, filename):
     try:
-        return f"{n_z},OK\n", run(model, n_z,orbit_method)
+        return f"{n_z},OK\n", run(model, n_z,orbit_method, filename)
     except Exception as e:
         print(f"Error running {orbit_method} with n_z={n_z}: {e}")
         return f"{n_z}, Error: {e}\n", None
 
-# ---- Main execution block ----
-if __name__ == "__main__":
 
+def prog_options():
     #_____Handling command line arguments_____
 
     parser = argparse.ArgumentParser(
@@ -110,24 +111,24 @@ if __name__ == "__main__":
     description="""This script is designed to test the Newton and Newton Picard Algorithm over the Brusselator model.
                 The goal is to compute periodic orbit solution wether they are stable or not"""
                 )
-    # parser.add_argument(
-    #                 "-n_file","--n_file", type=int,choices=range(1,5), default = 2,
-    #                 help="""This is the number of the parameter file to load the model configuration.
-    #                 Default is 2(An stable periodic orbit)"""
-    #                   )
+    
     parser.add_argument(
         "-param_file", "--param_file",type=str, nargs='?', default="bruss_dflt_params.in",
         help="""The path to the parameter file containing the model parameters.
                 Must be provided if not using the default parameter file 'bruss_dflt_params.in'."""
                       )
     parser.add_argument(
+        "-ns", "--nosave", action='store_false', help="Decide wether to save the results or not." \
+        " Defaut: save."
+                        )
+    parser.add_argument(
                     "-n_z","--n_z", type=int, default = 16,
                     help="""The gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
                             Default is 16 """
                       )
     parser.add_argument(
-                    "-sparse_jac","--sparse_jac", type=bool, default=False,
-                    help="""If True, use sparse jacobian matrix. Default is False (dense jacobian)"""
+                    "-sparse_jac","--sparse_jac", action='store_true', default=False,
+                    help="use sparse jacobian matrix. Default is dense jacobian matrix"
                       )
     parser.add_argument(
                     "-method", "--method",type=str, nargs='?', default="Newton_orbit",
@@ -135,34 +136,44 @@ if __name__ == "__main__":
                             Other options include 'Newton_Picard_subsp_iter'."""
                       )
     args = parser.parse_args()
-    BASE_PATH = Path().parent.resolve()
-    # file = "brusselator_params_%i.in" %args.n_file
-    param_file = BASE_PATH/args.param_file  #  file containing model parameters
-    today_analysis = datetime.today().strftime('%Y-%m-%d_%H-%M_%S')
-    
+    return args
 
+# ---- Main execution block ----
+if __name__ == "__main__":
+
+    
+#_____Handling command line arguments_____
+    args = prog_options()
+    
+    # Define the base path for the results
+    BASE_PATH = Path().parent.resolve()
+
+    param_file = BASE_PATH/args.param_file  #  file containing model parameters
+    print("Loaded file ", args.param_file)
     if args.sparse_jac:
         print("Using sparse jacobian")
         model = optim_BrusselatorModel(param_file)
     else:
         print("Using dense jacobian")
         model = BrusselatorModel(param_file)
-
-    if not(os.path.exists(model.out_dir)): #Create the ouput directory if it doesn't exist
-        os.makedirs(model.out_dir)
-    print("Loaded file ", args.param_file)
+    #Creating the output directory  
+    today_analysis = datetime.today().strftime('%Y-%m-%d_%H') 
     output_root_dir = BASE_PATH / "Results/"
+    # if not(os.path.exists(output_root_dir)): #Create the ouput directory if it doesn't exist
+    #     os.makedirs(output_root_dir)
     Dir_path = Path(output_root_dir/args.param_file/today_analysis)
     Dir_path.mkdir(parents=True, exist_ok=True)
-
-    orbit_method = args.method
-        
-    # print(f"Runing method: .........\n")
-
-    res = safe_run(model,args.n_z,orbit_method)
-    #Saving the results
-    file_path = f"{Dir_path/orbit_method}_{args.n_z}.txt"
-    with open(file_path, 'w') as f:
-        for item in res:
-            f.write(str(item) + '\n')
+    filename_prof = f"{Dir_path/args.method}_nz_{args.n_z}.prof"
+    file_path = Dir_path / f"{args.method}_{args.n_z}.pkl"
+    res = run(model,args.n_z,args.method,filename_prof)
+    if bool(args.nosave): 
+        with open(file_path, 'wb') as f:
+            pickle.dump(res, f)
+        print(f"Results saved to {file_path}")
+    # orbit_method = args.method
+    #Saving the results 
+    # file_path = f"{Dir_path/orbit_method}_{args.n_z}.txt"
+    # with open(file_path, 'w') as f:
+    #     for item in res:
+    #         f.write(str(item) + '\n')
     print("Analysis done")

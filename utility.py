@@ -580,7 +580,7 @@ class orbit:
 
         return k, T_by_iter, y_by_iter, Norm_B, Norm_DeltaY
 
-    def Newton_Picard_sub_proj(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2):
+    def Newton_Picard_sub_proj(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
         """----------Initialization--------"""
         y_star = y0.copy()
         y_prev = y0.copy()
@@ -603,7 +603,9 @@ class orbit:
             phi_T = phi_interp.y[:, -1].copy()
             #________________________________________________________________#
             """------Step 2: Compute dominant subspace via subspace iteration with projection"""
-            Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star,rho,p0, pe, subsp_iter, epsilon)
+            #Deciding whether to use the full subspace iteration or the subspace iteration with projection
+            nu_sub = subsp_iter if (full_sub_iter or k==0) else 1
+            Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star,rho,p0, pe, nu_sub, epsilon)
             p = max(p0, p_1)  # Ensure p > 0
             Vp = Ve @ Ye[:, :p]
             #________________________________________________________________#
@@ -651,7 +653,6 @@ class BrusselatorModel:
         self.read_params()
         self.Lap = self.Lap_mat() #To avoid several call in the next functions
                                           #Don't forget to recall it if you update the parameter n_z
-
     def read_params(self): 
         with open(self.ficname, 'r') as fic:
             for line in fic:
@@ -703,6 +704,8 @@ class BrusselatorModel:
                         self.rho = float(res)
                     elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
                         self.picard_iter = int(res)
+                    elif var == 'full_sub_iter':
+                        self.full_sub_iter = bool(int(res))
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                 
@@ -818,6 +821,8 @@ class optim_BrusselatorModel:
                         self.rho = float(res)
                     elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
                         self.picard_iter = int(res)
+                    elif var == 'full_sub_iter':
+                        self.full_sub_iter = bool(int(res))
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                 
@@ -1053,5 +1058,3 @@ class Mckean_Vlasov:
         # J_sparse = sp.sparse.bmat([[Jxx,diag_XX],
         #             [Jxy,Jyy]])
         return diag_J
-
-

@@ -11,6 +11,7 @@ module load anaconda3
 DIR=$HOME/Orbit-Solutions-
 cd $HOME/Orbit-Solutions-
 mkdir -p logs
+mkdir -p jobs
 #source $HOME/.bashrc
 #Create venv if it doesn't exist
 if [ ! -d "$DIR/.myvenv" ]; then
@@ -34,12 +35,14 @@ else
 fi
 
 methods=("Newton_Picard_sub_proj" "Newton_orbit")
-#file_params=("" "")
+parameter_files=("bruss_dflt_params.in" "notfull_subiter_bruss.in" "p_equal_2nz_bruss.in")
 Nz=(16 32 64 128 256 512 1024)
-#jobid=0
-for method in "${methods[@]}"; do
-    for nz in "${Nz[@]}"; do
-        cat > job_${method}_nz_${nz}.sh <<EOF
+
+param_id=0
+for param_file in "${parameter_files[@]}"; do
+    for method in "${methods[@]}"; do
+        for nz in "${Nz[@]}"; do
+            cat > jobs/job_${param_id}_${method}_nz_${nz}.sh <<EOF
 #!/bin/bash 
 #PBS -S /bin/bash
 #PBS -N run_sparse_${method}_${nz}
@@ -49,16 +52,18 @@ for method in "${methods[@]}"; do
 # #PBS -t 0-3 #To subimit the job as an array job, uncomment this line.
 #PBS -m bea
 #PBS -o logs/${method}_sparse_nz_${nz}.out
-#PBS -e logs/$method_sparse_nz_$nz.err
+#PBS -e logs/${method}_sparse_nz_${nz}.err
 #PBS -V
 #PBS -q plong
 cd $DIR
 $DIR/.myvenv/bin/python3 $DIR/run_analysis.py -n_z=$nz -method=$method -sparse_jac=1
 EOF
-       #submit the job script
-       qsub job_${method}_nz_${nz}.sh
-       echo "Submitted job script: job_script_${method}_nz_${nz}.sh"
-       #sleep 10
-       #((jobid++))
-   done
+            #submit the job script
+            qsub job_${param_id}_${method}_nz_${nz}.sh
+            echo "Submitted job script: job_${param_id}_${method}_nz_${nz}.sh"
+            #sleep 10
+            ((param_id++))
+        done
+    done
 done
+
