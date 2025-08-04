@@ -13,11 +13,12 @@ def wrapper(*args, **kwargs):
     global results
     results = call_method(*args, **kwargs)
 
-def run(model,n_z,orbit_method, filename):
+def run(model,n_z,orbit_method,p0,filename):
     global results
     #print('Running method %s with n_z = %i \n' % (orbit_method, n_z))
     epsilon = model.precision
     model.n_z = n_z
+    model.p0 = p0 #Size of the dominant subspace
     model.Lap = model.Lap_mat() #Upgrade the Laplacian matrix according to the new grid size
     f = model.dydt
     Jacf = model.brusselator_jacobian
@@ -25,7 +26,6 @@ def run(model,n_z,orbit_method, filename):
     X0 = model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
     Y0 = model.B/model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
     y0 = np.concatenate([X0[1:-1],Y0[1:-1]])
-
     #We integrate sufficiently the equation to find a good starting point
     phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
                 t_eval=[16*model.T_ini],
@@ -38,7 +38,7 @@ def run(model,n_z,orbit_method, filename):
     global orbit_finder
     orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, "RK45",10000,model.max_iter, epsilon)
 
-    V_0 = np.eye(len(y_T))[:,:model.p0+model.pe]#Initial guess of the subspace
+    V_0 = np.eye(len(y_T))[:,:p0+model.pe]#Initial guess of the subspace
     global args_func #The arguments to pass to the orbit_finder method
     args_func = {
     "y0": y_T,
@@ -48,7 +48,7 @@ def run(model,n_z,orbit_method, filename):
     "subsp_iter": model.subsp_iter,
     "l": model.picard_iter,
     "Ve_0": V_0,
-    "p0": model.p0,
+    "p0": p0,
     "pe": model.pe,
     "rho": model.rho,
     "phase_cond": 2,
@@ -57,7 +57,6 @@ def run(model,n_z,orbit_method, filename):
     }
     global method_to_call
     method_to_call= getattr(orbit_finder, orbit_method)
-    print('method ', method_to_call)
     cProfile.run('wrapper(method_to_call,**args_func)',filename)
 
     k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = results
@@ -78,7 +77,7 @@ def run(model,n_z,orbit_method, filename):
     results = dict(
         orbit_method = orbit_method,
         nz = n_z,
-        p0 = model.p0,
+        p0 = p0,
         pe=model.pe,
         sub_sp_iter = model.subsp_iter,
         full_sub_iter = model.full_sub_iter,
@@ -95,9 +94,9 @@ def run(model,n_z,orbit_method, filename):
 
 # ---- Run the orbit finder with error handling ----
 #-----Allows me to track the progress of the run and save results to a file-----
-def safe_run(model,n_z,orbit_method, filename):
+def safe_run(model,n_z,orbit_method,p0,filename):
     try:
-        return f"{n_z},OK\n", run(model, n_z,orbit_method, filename)
+        return f"{n_z},OK\n", run(model, n_z,orbit_method,p0,filename)
     except Exception as e:
         print(f"Error running {orbit_method} with n_z={n_z}: {e}")
         return f"{n_z}, Error: {e}\n", None
@@ -125,6 +124,11 @@ def prog_options():
                     "-n_z","--n_z", type=int, default = 16,
                     help="""The gird size n_z over which the method will be tested. We assume that the list of n_z is defined as [16, 32, 64,....].
                             Default is 16 """
+                      )
+    parser.add_argument(
+                    "-p0","--p0", type=int, default = 5,
+                    help="""The size of the dominant subspace computed using the subspace iteration algorithme.
+                            Default is 5 """
                       )
     parser.add_argument(
                     "-sparse_jac","--sparse_jac", action='store_true', default=False,
@@ -165,15 +169,14 @@ if __name__ == "__main__":
     Dir_path.mkdir(parents=True, exist_ok=True)
     filename_prof = f"{Dir_path/args.method}_nz_{args.n_z}.prof"
     file_path = Dir_path / f"{args.method}_{args.n_z}.pkl"
-    res = run(model,args.n_z,args.method,filename_prof)
+    res = safe_run(model,args.n_z,args.method,args.p0,filename_prof)
     if bool(args.nosave): 
         with open(file_path, 'wb') as f:
             pickle.dump(res, f)
+        #Saving the results 
+        file_path = f"{Dir_path/args.method}_{args.n_z}.txt"
+        with open(file_path, 'w') as f:
+            for item in res:
+                f.write(str(item) + '\n')
         print(f"Results saved to {file_path}")
-    # orbit_method = args.method
-    #Saving the results 
-    # file_path = f"{Dir_path/orbit_method}_{args.n_z}.txt"
-    # with open(file_path, 'w') as f:
-    #     for item in res:
-    #         f.write(str(item) + '\n')
     print("Analysis done")

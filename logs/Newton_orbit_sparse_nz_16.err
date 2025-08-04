@@ -1,0 +1,3 @@
+usage: run_analysis.py [-h] [-param_file [PARAM_FILE]] [-ns] [-n_z N_Z]
+                       [-sparse_jac] [-method [METHOD]]
+run_analysis.py: error: argument -sparse_jac/--sparse_jac: ignored explicit argument '1'

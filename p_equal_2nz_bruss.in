@@ -15,11 +15,12 @@ Max_iter=7
 #PARMETERS FOR NEWTON-PICARD Method
 rho=0.5
 picard_iter=2
-full_sub_iter=0
+full_sub_iter=1
 #0=False: subsp_iter will be muted to 1 except for the first NP iteration
 subsp_iter=5
+#For this file p0 will be muted wrt n_z (we test the case p=p0=dim, see run_analysis.py) 
 p0=5
-pe=4
+pe=0
 #if fixed time step solver
 solver_steps=100
 #X_ini=A+0.1*sin(pi*(z/z_L))

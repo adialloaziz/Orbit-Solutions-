@@ -1,0 +1,33 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  p_equal_2nz_bruss.in
+Using sparse jacobian
+Iteration 0: $||\Delta y||$= 3.107e-01, T = 3.60534
+Iteration 1: $||\Delta y||$= 2.895e-01, T = 3.44701
+Iteration 2: $||\Delta y||$= 2.148e-02, T = 3.43490
+Iteration 3: $||\Delta y||$= 1.398e-04, T = 3.43486
+Iteration 4: $||\Delta y||$= 5.377e-09, T = 3.43486
+Iteration 5: $||\Delta y||$= 3.943e-15, T = 3.43486
+Precision reached within 6 iterations
+Total time in Newton_orbit: 21.004048 seconds
+Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-07-31_15/Newton_orbit_32.txt
+Analysis done

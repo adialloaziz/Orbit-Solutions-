@@ -19,28 +19,3 @@
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 
-Using sparse jacobian
-Loaded file  bruss_dflt_params.in
-Iteration 0:$||\Delta y ||$ = 2.560e-01, T = 3.58282, p = 5
-$||\Delta q ||$ = 1.412e-01
-$||\Delata p || $= 2.135e-01
-Iteration 1:$||\Delta y ||$ = 1.900e-01, T = 3.50362, p = 5
-$||\Delta q ||$ = 1.375e-01
-$||\Delata p || $= 1.311e-01
-Iteration 2:$||\Delta y ||$ = 4.536e-02, T = 3.45335, p = 5
-$||\Delta q ||$ = 4.241e-03
-$||\Delata p || $= 4.517e-02
-Iteration 3:$||\Delta y ||$ = 3.527e-02, T = 3.45196, p = 5
-$||\Delta q ||$ = 2.260e-03
-$||\Delata p || $= 3.520e-02
-Iteration 4:$||\Delta y ||$ = 9.315e-03, T = 3.43744, p = 5
-$||\Delta q ||$ = 4.109e-04
-$||\Delata p || $= 9.306e-03
-Iteration 5:$||\Delta y ||$ = 2.696e-03, T = 3.43308, p = 5
-$||\Delta q ||$ = 3.460e-04
-$||\Delata p || $= 2.674e-03
-Iteration 6:$||\Delta y ||$ = 3.994e-03, T = 3.43461, p = 5
-$||\Delta q ||$ = 3.994e-03
-$||\Delata p || $= 3.969e-06
-Total time in Newton_Picard_sub_proj: 77.310218 seconds
-Analysis done

@@ -1,0 +1,47 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  p_equal_2nz_bruss.in
+Using sparse jacobian
+Iteration 0:$||\Delta y ||$ = 3.889e-01, T = 3.46267, p = 254
+$||\Delta q ||$ = 8.910e-15
+$||\Delata p || $= 3.889e-01
+Iteration 1:$||\Delta y ||$ = 2.744e-01, T = 3.57182, p = 254
+$||\Delta q ||$ = 2.612e-15
+$||\Delata p || $= 2.744e-01
+Iteration 2:$||\Delta y ||$ = 2.707e-01, T = 3.43631, p = 254
+$||\Delta q ||$ = 1.406e-15
+$||\Delata p || $= 2.707e-01
+Iteration 3:$||\Delta y ||$ = 8.796e-02, T = 3.40980, p = 254
+$||\Delta q ||$ = 2.714e-16
+$||\Delata p || $= 8.796e-02
+Iteration 4:$||\Delta y ||$ = 7.060e-02, T = 3.43950, p = 254
+$||\Delta q ||$ = 3.230e-16
+$||\Delata p || $= 7.060e-02
+Iteration 5:$||\Delta y ||$ = 2.144e-02, T = 3.44104, p = 254
+$||\Delta q ||$ = 1.179e-16
+$||\Delata p || $= 2.144e-02
+Iteration 6:$||\Delta y ||$ = 1.066e-02, T = 3.43444, p = 254
+$||\Delta q ||$ = 6.759e-17
+$||\Delata p || $= 1.066e-02
+Total time in Newton_Picard_sub_proj: 683.901924 seconds
+Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-07-31_00/Newton_Picard_sub_proj_128.txt
+Analysis done

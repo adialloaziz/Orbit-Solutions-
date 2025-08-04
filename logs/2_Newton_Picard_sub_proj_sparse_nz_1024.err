@@ -1,0 +1,3 @@
+/home/diallo/Orbit-Solutions-/.myvenv/lib/python3.12/site-packages/scipy/integrate/_ivp/ivp.py:621: UserWarning: The following arguments have no effect for a chosen solver: `jac`.
+  solver = method(fun, t0, y0, tf, vectorized=vectorized, **options)
+=>> PBS: job killed: walltime 360033 exceeded limit 360000

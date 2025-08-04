@@ -1,0 +1,33 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  notfull_subiter_bruss.in
+Using sparse jacobian
+Iteration 0: $||\Delta y||$= 1.780e+00, T = 3.60572
+Iteration 1: $||\Delta y||$= 1.659e+00, T = 3.44728
+Iteration 2: $||\Delta y||$= 1.228e-01, T = 3.43505
+Iteration 3: $||\Delta y||$= 8.071e-04, T = 3.43500
+Iteration 4: $||\Delta y||$= 3.097e-08, T = 3.43500
+Iteration 5: $||\Delta y||$= 7.881e-12, T = 3.43500
+Precision reached within 6 iterations
+Total time in Newton_orbit: 198328.642417 seconds
+Results saved to /home/diallo/Orbit-Solutions-/Results/notfull_subiter_bruss.in/2025-07-30_22/Newton_orbit_1024.txt
+Analysis done
