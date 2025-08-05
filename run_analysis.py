@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from utility import orbit, BrusselatorModel, optim_BrusselatorModel,call_method
 from pathlib import Path
-import argparse, os
+import argparse, os, time
 from datetime import datetime
 import cProfile
 import pstats, pickle
@@ -13,7 +13,7 @@ def wrapper(*args, **kwargs):
     global results
     results = call_method(*args, **kwargs)
 
-def run(model,n_z,orbit_method,p0,filename):
+def run_profiling(model,n_z,orbit_method,p0,filename=None):
     global results
     #print('Running method %s with n_z = %i \n' % (orbit_method, n_z))
     epsilon = model.precision
@@ -92,6 +92,69 @@ def run(model,n_z,orbit_method,p0,filename):
     
     return results
 
+def run(model,n_z,orbit_method,p0,filename=None):
+
+    epsilon = model.precision
+    model.n_z = n_z
+    model.p0 = p0 #Size of the dominant subspace
+    model.Lap = model.Lap_mat() #Upgrade the Laplacian matrix according to the new grid size
+    f = model.dydt
+    Jacf = model.brusselator_jacobian
+    #Initialization
+    X0 = model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
+    Y0 = model.B/model.A + 0.1*np.sin(np.pi*(np.linspace(0, model.z_L, model.n_z)/model.z_L))
+    y0 = np.concatenate([X0[1:-1],Y0[1:-1]])
+    #We integrate sufficiently the equation to find a good starting point
+    phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
+                t_eval=[16*model.T_ini],
+                # dense_output=True,
+                y0=y0, method='RK45', 
+                **{"rtol": 1e-5,"atol":1e-7}
+                )
+    
+    y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
+    orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, "RK45",10000,model.max_iter, epsilon)
+
+    V_0 = np.eye(len(y_T))[:,:p0+model.pe]#Initial guess of the subspace
+    #The arguments to pass to the orbit_finder method
+    args_func = {
+    "y0": y_T,
+    "T_0": model.T_ini,
+    "Max_iter": model.max_iter,
+    "epsilon": epsilon,
+    "subsp_iter": model.subsp_iter,
+    "l": model.picard_iter,
+    "Ve_0": V_0,
+    "p0": p0,
+    "pe": model.pe,
+    "rho": model.rho,
+    "phase_cond": 2,
+    "l": model.picard_iter,
+    "full_sub_iter": model.full_sub_iter,  # Use the full subspace iteration if True for the subspace iteration with projection
+    }
+    method_to_call= getattr(orbit_finder, orbit_method)
+
+    start = time.time()
+    k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args_func)
+    end = time.time()
+    total_time = end - start
+               
+    results = dict(
+        orbit_method = orbit_method,
+        nz = n_z,
+        p0 = p0,
+        pe=model.pe,
+        sub_sp_iter = model.subsp_iter,
+        full_sub_iter = model.full_sub_iter,
+        rho = model.rho,
+        n_iter = k,
+        precison = Norm_Deltay[k],
+        comput_time = total_time,
+        T_star = T_by_iter[k],
+    )
+    
+    return results
+
 # ---- Run the orbit finder with error handling ----
 #-----Allows me to track the progress of the run and save results to a file-----
 def safe_run(model,n_z,orbit_method,p0,filename):
@@ -161,7 +224,7 @@ if __name__ == "__main__":
         print("Using dense jacobian")
         model = BrusselatorModel(param_file)
     #Creating the output directory  
-    today_analysis = datetime.today().strftime('%Y-%m-%d_%H') 
+    today_analysis = datetime.today().strftime('%Y-%m-%d') 
     output_root_dir = BASE_PATH / "Results/"
     # if not(os.path.exists(output_root_dir)): #Create the ouput directory if it doesn't exist
     #     os.makedirs(output_root_dir)

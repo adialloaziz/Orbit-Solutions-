@@ -887,7 +887,7 @@ class optim_BrusselatorModel:
 def call_method(method, **kwargs):
     from inspect import signature
 
-    # Récupere les parametres attendus par la methode
+    # Get the expected parameters of the method
     sig = signature(method)
     valid_args = {k: v for k, v in kwargs.items() if k in sig.parameters}
 
