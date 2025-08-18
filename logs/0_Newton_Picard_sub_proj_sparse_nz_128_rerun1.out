@@ -1,0 +1,48 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  bruss_dflt_params.in
+Using sparse jacobian
+Iteration 0:$||\Delta y ||$ = 4.724e-01, T = 3.55253, p = 5
+$||\Delta q ||$ = 2.856e-01
+$||\Delata p || $= 3.763e-01
+Iteration 1:$||\Delta y ||$ = 3.389e-01, T = 3.51111, p = 5
+$||\Delta q ||$ = 2.666e-01
+$||\Delata p || $= 2.092e-01
+Iteration 2:$||\Delta y ||$ = 2.439e-01, T = 3.48099, p = 5
+$||\Delta q ||$ = 8.383e-03
+$||\Delata p || $= 2.438e-01
+Iteration 3:$||\Delta y ||$ = 7.815e-02, T = 3.43789, p = 5
+$||\Delta q ||$ = 4.948e-03
+$||\Delata p || $= 7.799e-02
+Iteration 4:$||\Delta y ||$ = 1.700e-02, T = 3.43433, p = 5
+$||\Delta q ||$ = 8.080e-03
+$||\Delata p || $= 1.496e-02
+Iteration 5:$||\Delta y ||$ = 5.132e-03, T = 3.43348, p = 5
+$||\Delta q ||$ = 4.538e-04
+$||\Delata p || $= 5.112e-03
+Iteration 6:$||\Delta y ||$ = 3.100e-03, T = 3.43442, p = 5
+$||\Delta q ||$ = 1.661e-05
+$||\Delata p || $= 3.100e-03
+Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-08-12/Newton_Picard_sub_proj_128.txt
+Analysis done
+Running on node: phlam-s-sakura.univ-lille1.fr
+MemTotal:       264626640 kB

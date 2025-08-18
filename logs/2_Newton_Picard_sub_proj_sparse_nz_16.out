@@ -21,27 +21,26 @@
 
 Loaded file  p_equal_2nz_bruss.in
 Using sparse jacobian
-Iteration 0:$||\Delta y ||$ = 1.764e-01, T = 3.38350, p = 30
-$||\Delta q ||$ = 2.150e-15
-$||\Delata p || $= 1.764e-01
-Iteration 1:$||\Delta y ||$ = 7.908e-02, T = 3.58631, p = 30
-$||\Delta q ||$ = 2.067e-15
-$||\Delata p || $= 7.908e-02
-Iteration 2:$||\Delta y ||$ = 8.432e-02, T = 3.62671, p = 30
-$||\Delta q ||$ = 1.957e-16
-$||\Delata p || $= 8.432e-02
-Iteration 3:$||\Delta y ||$ = 6.411e-02, T = 3.50549, p = 30
-$||\Delta q ||$ = 3.502e-16
-$||\Delata p || $= 6.411e-02
-Iteration 4:$||\Delta y ||$ = 2.863e-02, T = 3.49853, p = 30
-$||\Delta q ||$ = 9.268e-17
-$||\Delata p || $= 2.863e-02
-Iteration 5:$||\Delta y ||$ = 1.905e-02, T = 3.43355, p = 30
-$||\Delta q ||$ = 9.278e-17
-$||\Delata p || $= 1.905e-02
-Iteration 6:$||\Delta y ||$ = 6.919e-03, T = 3.44095, p = 30
-$||\Delta q ||$ = 1.916e-17
-$||\Delata p || $= 6.919e-03
-Total time in Newton_Picard_sub_proj: 77.970212 seconds
-Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-07-30_23/Newton_Picard_sub_proj_16.txt
+Iteration 0:$||\Delta y ||$ = 1.673e-01, T = 3.44239, p = 30
+$||\Delta q ||$ = 2.532e-15
+$||\Delata p || $= 1.673e-01
+Iteration 1:$||\Delta y ||$ = 1.091e-01, T = 3.69288, p = 30
+$||\Delta q ||$ = 3.281e-15
+$||\Delata p || $= 1.091e-01
+Iteration 2:$||\Delta y ||$ = 2.617e-01, T = 3.58825, p = 30
+$||\Delta q ||$ = 1.179e-15
+$||\Delata p || $= 2.617e-01
+Iteration 3:$||\Delta y ||$ = 9.605e-02, T = 3.38539, p = 30
+$||\Delta q ||$ = 6.784e-16
+$||\Delata p || $= 9.605e-02
+Iteration 4:$||\Delta y ||$ = 7.017e-02, T = 3.48593, p = 30
+$||\Delta q ||$ = 3.387e-16
+$||\Delata p || $= 7.017e-02
+Iteration 5:$||\Delta y ||$ = 3.455e-02, T = 3.45400, p = 30
+$||\Delta q ||$ = 9.092e-17
+$||\Delata p || $= 3.455e-02
+Iteration 6:$||\Delta y ||$ = 2.501e-02, T = 3.43570, p = 30
+$||\Delta q ||$ = 2.703e-16
+$||\Delata p || $= 2.501e-02
+Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-08-05/Newton_Picard_sub_proj_16.txt
 Analysis done

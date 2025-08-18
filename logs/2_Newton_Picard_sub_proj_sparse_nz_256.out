@@ -21,27 +21,26 @@
 
 Loaded file  p_equal_2nz_bruss.in
 Using sparse jacobian
-Iteration 0:$||\Delta y ||$ = 4.559e-01, T = 3.27758, p = 510
-$||\Delta q ||$ = 1.415e-14
-$||\Delata p || $= 4.559e-01
-Iteration 1:$||\Delta y ||$ = 3.099e-01, T = 3.53081, p = 510
-$||\Delta q ||$ = 2.900e-14
-$||\Delata p || $= 3.099e-01
-Iteration 2:$||\Delta y ||$ = 7.336e-01, T = 3.44178, p = 510
-$||\Delta q ||$ = 2.243e-15
-$||\Delata p || $= 7.336e-01
-Iteration 3:$||\Delta y ||$ = 6.516e-01, T = 3.40379, p = 510
-$||\Delta q ||$ = 5.204e-16
-$||\Delata p || $= 6.516e-01
-Iteration 4:$||\Delta y ||$ = 3.594e-01, T = 3.48756, p = 510
-$||\Delta q ||$ = 1.593e-15
-$||\Delata p || $= 3.594e-01
-Iteration 5:$||\Delta y ||$ = 1.687e-01, T = 3.45391, p = 510
-$||\Delta q ||$ = 1.264e-15
-$||\Delata p || $= 1.687e-01
-Iteration 6:$||\Delta y ||$ = 8.234e-02, T = 3.43370, p = 510
-$||\Delta q ||$ = 5.526e-16
-$||\Delata p || $= 8.234e-02
-Total time in Newton_Picard_sub_proj: 5368.429393 seconds
-Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-07-31_00/Newton_Picard_sub_proj_256.txt
+Iteration 0:$||\Delta y ||$ = 8.552e-01, T = 3.55573, p = 510
+$||\Delta q ||$ = 1.387e-14
+$||\Delata p || $= 8.552e-01
+Iteration 1:$||\Delta y ||$ = 6.076e-01, T = 3.56089, p = 510
+$||\Delta q ||$ = 3.917e-15
+$||\Delata p || $= 6.076e-01
+Iteration 2:$||\Delta y ||$ = 1.669e-01, T = 3.45709, p = 510
+$||\Delta q ||$ = 2.048e-15
+$||\Delata p || $= 1.669e-01
+Iteration 3:$||\Delta y ||$ = 6.267e-02, T = 3.46635, p = 510
+$||\Delta q ||$ = 2.009e-16
+$||\Delata p || $= 6.267e-02
+Iteration 4:$||\Delta y ||$ = 4.218e-02, T = 3.44420, p = 510
+$||\Delta q ||$ = 6.095e-16
+$||\Delata p || $= 4.218e-02
+Iteration 5:$||\Delta y ||$ = 1.359e-02, T = 3.43741, p = 510
+$||\Delta q ||$ = 1.877e-16
+$||\Delata p || $= 1.359e-02
+Iteration 6:$||\Delta y ||$ = 3.824e-03, T = 3.43527, p = 510
+$||\Delta q ||$ = 4.610e-17
+$||\Delata p || $= 3.824e-03
+Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-08-05/Newton_Picard_sub_proj_256.txt
 Analysis done

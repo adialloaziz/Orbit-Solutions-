@@ -1,0 +1,3 @@
+64,OK
+
+{'orbit_method': 'Newton_Picard_sub_proj', 'nz': 64, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': True, 'rho': 0.5, 'n_iter': 6, 'precison': np.float64(0.004697820846858206), 'comput_time': 70.10599708557129, 'T_star': np.float64(3.435682487631366)}

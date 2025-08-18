@@ -1,0 +1,3 @@
+128,OK
+
+{'orbit_method': 'Newton_orbit', 'nz': 128, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': False, 'rho': 0.5, 'n_iter': 5, 'precison': np.float64(7.412835634038985e-11), 'comput_time': 155.91045236587524, 'T_star': np.float64(3.4349949112800053)}

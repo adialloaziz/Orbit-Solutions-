@@ -21,27 +21,26 @@
 
 Loaded file  p_equal_2nz_bruss.in
 Using sparse jacobian
-Iteration 0:$||\Delta y ||$ = 7.799e-01, T = 3.46243, p = 1022
-$||\Delta q ||$ = 1.492e-14
-$||\Delata p || $= 7.799e-01
-Iteration 1:$||\Delta y ||$ = 4.957e-01, T = 3.52782, p = 1022
-$||\Delta q ||$ = 5.686e-15
-$||\Delata p || $= 4.957e-01
-Iteration 2:$||\Delta y ||$ = 3.681e-01, T = 3.52003, p = 1022
-$||\Delta q ||$ = 1.855e-15
-$||\Delata p || $= 3.681e-01
-Iteration 3:$||\Delta y ||$ = 9.724e-02, T = 3.44767, p = 1022
-$||\Delta q ||$ = 2.441e-15
-$||\Delata p || $= 9.724e-02
-Iteration 4:$||\Delta y ||$ = 4.887e-02, T = 3.43333, p = 1022
-$||\Delta q ||$ = 1.824e-16
-$||\Delata p || $= 4.887e-02
-Iteration 5:$||\Delta y ||$ = 3.768e-02, T = 3.43189, p = 1022
-$||\Delta q ||$ = 6.137e-17
-$||\Delata p || $= 3.768e-02
-Iteration 6:$||\Delta y ||$ = 8.159e-03, T = 3.43580, p = 1022
-$||\Delta q ||$ = 1.343e-16
-$||\Delata p || $= 8.159e-03
-Total time in Newton_Picard_sub_proj: 80965.234998 seconds
-Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-07-31_01/Newton_Picard_sub_proj_512.txt
+Iteration 0:$||\Delta y ||$ = 9.434e-01, T = 3.38295, p = 1022
+$||\Delta q ||$ = 2.118e-14
+$||\Delata p || $= 9.434e-01
+Iteration 1:$||\Delta y ||$ = 4.206e-01, T = 3.57955, p = 1022
+$||\Delta q ||$ = 1.773e-14
+$||\Delata p || $= 4.206e-01
+Iteration 2:$||\Delta y ||$ = 5.449e-01, T = 3.61274, p = 1022
+$||\Delta q ||$ = 1.724e-15
+$||\Delata p || $= 5.449e-01
+Iteration 3:$||\Delta y ||$ = 1.579e-01, T = 3.47789, p = 1022
+$||\Delta q ||$ = 4.884e-15
+$||\Delata p || $= 1.579e-01
+Iteration 4:$||\Delta y ||$ = 3.305e-01, T = 3.51274, p = 1022
+$||\Delta q ||$ = 3.993e-16
+$||\Delata p || $= 3.305e-01
+Iteration 5:$||\Delta y ||$ = 1.021e-01, T = 3.44047, p = 1022
+$||\Delta q ||$ = 2.582e-15
+$||\Delata p || $= 1.021e-01
+Iteration 6:$||\Delta y ||$ = 1.755e-01, T = 3.42344, p = 1022
+$||\Delta q ||$ = 2.193e-16
+$||\Delata p || $= 1.755e-01
+Results saved to /home/diallo/Orbit-Solutions-/Results/p_equal_2nz_bruss.in/2025-08-05/Newton_Picard_sub_proj_512.txt
 Analysis done

@@ -25,9 +25,8 @@ Iteration 0: $||\Delta y||$= 8.887e-01, T = 3.60571
 Iteration 1: $||\Delta y||$= 8.281e-01, T = 3.44728
 Iteration 2: $||\Delta y||$= 6.131e-02, T = 3.43504
 Iteration 3: $||\Delta y||$= 4.029e-04, T = 3.43500
-Iteration 4: $||\Delta y||$= 1.547e-08, T = 3.43500
-Iteration 5: $||\Delta y||$= 1.980e-10, T = 3.43500
+Iteration 4: $||\Delta y||$= 1.546e-08, T = 3.43500
+Iteration 5: $||\Delta y||$= 1.209e-10, T = 3.43500
 Precision reached within 6 iterations
-Total time in Newton_orbit: 6487.876379 seconds
-Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-07-30_17/Newton_orbit_256.txt
+Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-08-05/Newton_orbit_256.txt
 Analysis done
