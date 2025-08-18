@@ -984,26 +984,31 @@ class Mckean_Vlasov:
         y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z/3)) - np.cosh(np.asinh(z)))/denom)
         return y
     
-    # def V(self, z, rho):
-    #     "The potential function"
-    #     _,_, h = self.mesh1D  # Get the mesh and centers
-    #     # return z*z/2 #+ 0*h*np.convolve(self.Haissinski_kernel(z), rho, mode='same')
-    #     return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho, dx=h)
-
     def V(self, z, rho):
-        "The integral of the potential function"
-        # return z*z/2 + 0*h*np.convolve(self.Haissinski_kernel(z), rho, mode='same')
-        _,_, h = self.mesh1D
-        h_kernel = self.Haissinski_kernel(z)
-        c = np.r_[h_kernel,np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
-        r = np.r_[h_kernel[0],np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
-        kernel_mat = sp.linalg.toeplitz(c,r)  # Create a Toeplitz matrix for the kernel
-        # print(f"Kernel matrix shape: {kernel_mat.shape}, rho shape: {rho.shape}")
+        "The potential function"
+        _,_, h = self.mesh1D  # Get the mesh and centers
+        # C_mat = np.zeros((len(z), len(z))) # Initialize a matrix to hold the kernel values
         # for i in range(len(z)):
-        #     kernal_mat[i,:] = self.Haissinski_kernel(z[i] - z)
-        y = kernel_mat @ rho 
-        print("y shape:", y.shape)
-        return z*z/2 + y[1:-1]
+        #     C_mat[i,:] = self.Haissinski_kernel(z[i] - z)
+        
+        # return h/2 + h*(C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
+        return z*z/2 + sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
+        # return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho, dx=h)
+
+    # def V(self, z, rho):
+    #     "The integral of the potential function"
+    #     # return z*z/2 + 0*h*np.convolve(self.Haissinski_kernel(z), rho, mode='same')
+    #     _,_, h = self.mesh1D
+    #     h_kernel = self.Haissinski_kernel(z)
+    #     c = np.r_[h_kernel,np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
+    #     r = np.r_[h_kernel[0],np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
+    #     kernel_mat = sp.linalg.toeplitz(c,r)  # Create a Toeplitz matrix for the kernel
+    #     # print(f"Kernel matrix shape: {kernel_mat.shape}, rho shape: {rho.shape}")
+    #     # for i in range(len(z)):
+    #     #     kernal_mat[i,:] = self.Haissinski_kernel(z[i] - z)
+    #     y = kernel_mat @ rho 
+    #     print("y shape:", y.shape)
+    #     return z*z/2 + y[1:-1]
 
     
 
@@ -1027,9 +1032,9 @@ class Mckean_Vlasov:
         F_K = np.zeros_like(x_centers)
 
         F_L = np.zeros_like(x_centers)  
-        F_K[:-1] = self.Bernoulli((V[:-1] - V[1:])*h)*y[1:] - self.Bernoulli((V[1:] - V[:-1])*h)*y[:-1]  # Force term, B is the Bernoulli function
+        F_K[:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
         
-        F_L[1:] = self.Bernoulli((V[:-1] - V[1:])*h)*y[1:] - self.Bernoulli((V[1:] - V[:-1])*h)*y[:-1]  # Force term, L is the Laplacian
+        F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1] 
         
         dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
         return dydt
