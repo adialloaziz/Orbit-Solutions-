@@ -338,7 +338,7 @@ class orbit:
         y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
         Norm_B, Norm_Deltay = np.zeros((Max_iter)), np.zeros((Max_iter)) 
         I = np.eye(self.dim)
-        #_____________Newton iteration loop________________
+        #______________________________Newton iteration loop________________
         for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
             
             #Soving the whole system over one period
@@ -900,7 +900,14 @@ class Mckean_Vlasov:
         self.ficname = ficname
         self.read_params()
         self.mesh1D = self.mesh1D()  # Initialize the mesh
-    
+        self.M_sift = self.M_sifter(self.n_z)  # Create the sifting matrix for the mesh size n_z 
+        self.C_mat = self.Conv_mat()  # Precompute the convolution matrix for the Haissinski kernel
+        self.C_mat_sifted = np.roll(self.C_mat, -1, axis=0)  # Shift the convolution matrix to match the mesh centers
+    def M_sifter(self, n):
+        M = sp.sparse.diags([-1, 1], [0, 1], shape=(n-1,n),format='csr')  # Sifting matrix for the mesh
+
+        return M
+       
     def read_params(self): 
         with open(self.ficname, 'r') as fic:
             for line in fic:
@@ -963,12 +970,6 @@ class Mckean_Vlasov:
     
     def Bernoulli(self,z):
         "The Bernoulli function"
-        # y = 1
-
-        # if np.abs(z)>1e-8:
-        #     return z/(np.exp(z)-1)
-        # else:
-
         return np.where(np.abs(z)<=1e-8,1, z/(np.exp(z)-1))
 
     def derivative_Bernoulli(self, z):
@@ -981,42 +982,23 @@ class Mckean_Vlasov:
         # We only compute the kernel for positive z
         denom = np.sinh(2 * np.asinh(z))
         denom = np.where(np.abs(denom) < 1e-8,1, denom)  # Replace near-zero denominators with 1
-        y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z/3)) - np.cosh(np.asinh(z)))/denom)
-        return y
+        y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
+        return 0*y
+    def Conv_mat(self):
+        "The convolution matrix for the Haissinski kernel"
+        _,z, h = self.mesh1D  # Get the mesh and centers
+        C_mat = np.zeros((len(z), len(z))) # Initialize a matrix to hold the kernel values
+        for i in range(len(z)):
+            C_mat[i,:] = self.Haissinski_kernel(z[i] - z)
+        return C_mat
     
     def V(self, z, rho):
         "The potential function"
-        _,_, h = self.mesh1D  # Get the mesh and centers
-        # C_mat = np.zeros((len(z), len(z))) # Initialize a matrix to hold the kernel values
-        # for i in range(len(z)):
-        #     C_mat[i,:] = self.Haissinski_kernel(z[i] - z)
-        
-        # return h/2 + h*(C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
-        return z*z/2 + sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
-        # return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho, dx=h)
-
-    # def V(self, z, rho):
-    #     "The integral of the potential function"
-    #     # return z*z/2 + 0*h*np.convolve(self.Haissinski_kernel(z), rho, mode='same')
-    #     _,_, h = self.mesh1D
-    #     h_kernel = self.Haissinski_kernel(z)
-    #     c = np.r_[h_kernel,np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
-    #     r = np.r_[h_kernel[0],np.zeros(len(rho)-1)]  # Extend the kernel to match the length of rho
-    #     kernel_mat = sp.linalg.toeplitz(c,r)  # Create a Toeplitz matrix for the kernel
-    #     # print(f"Kernel matrix shape: {kernel_mat.shape}, rho shape: {rho.shape}")
-    #     # for i in range(len(z)):
-    #     #     kernal_mat[i,:] = self.Haissinski_kernel(z[i] - z)
-    #     y = kernel_mat @ rho 
-    #     print("y shape:", y.shape)
-    #     return z*z/2 + y[1:-1]
-
+        _,_, h = self.mesh1D
+        # return  z*z/2 + (self.C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
+        return np.ones_like(z) #z*z/2 + 0*sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
+        # return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho)
     
-
-    def V_derivative(self, z, rho):
-        "The derivative of the potential function"
-        return z + np.convolve(self.Haissinski_kernel(z), rho, mode='same') * self.derivative_Bernoulli(z)
-    
-
     def mesh1D(self):
         "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
         h = (self.xmax - self.xmin) / (self.n_z - 1)
@@ -1024,42 +1006,54 @@ class Mckean_Vlasov:
         # Centers of the mesh cells
         x_centers = x[:-1] + h/2
         return (x, x_centers, h)
+    
+    def flux(self, y):
+        "Compute the flux of the density y"
+        x, x_centers, h = self.mesh1D
+        V = self.V(x_centers, y)  # Potential at the center of the cells
+        F_L = np.zeros_like(x_centers)  # Containining all the flux values
+        #No flux on the boundaries
+        F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
+        return F_L
+    
     def dydt(self, t, y):
         "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
         #We suppose a uniform mesh in the interval [xmin, xmax]
         x, x_centers,h = self.mesh1D  # Get the mesh and centers
-        V = self.V(x_centers, y)  # Potential at the center of the cells
-        F_K = np.zeros_like(x_centers)
+        # V = self.V(x_centers, y)  # Potential at the center of the cells
+        # # F_K = np.zeros(self.n_z)  # Force term K
+        # F_K = np.zeros_like(x_centers)  # Force term K
+        # F_L = np.zeros_like(x_centers)  
+        # # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
 
-        F_L = np.zeros_like(x_centers)  
-        F_K[:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
-        
-        F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1] 
-        
-        dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
+        # F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1] 
+        # F_K[:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
+        F_L= self.flux(y)  # Flux of the density y
+
+        # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
+        F_K = np.roll(F_L, shift=-1)
+        dydt = (F_K - F_L) / (h*h)  # Sifting matrix to apply the finite volume scheme
         return dydt
     
     def jacobian(self, t, y):
         "Jacobian of the right hand side of the Mckean-Vlasov equation"
         x, x_centers, h = self.mesh1D  # Get the mesh and centers
-        V = self.V(x_centers, y[1:-1])  # Potential at the center of the cells 
-        
-        diag_J = np.zeros_like(y)
-        # dF_K = self.Bernoulli((V[:-1] - V[1:])*h) - (self.derivative_Bernoulli((V[:-1] - V[1:])*h)*y[:1] )* # Derivative of the force term K
+        V = self.V(x_centers, y)#y[1:-1])  # Potential at the center of the cells 
+        B_left = self.Bernoulli((V[:-1] - V[1:])*h)
+        B_right = self.Bernoulli((V[1:] - V[:-1])*h)
 
-        
-        # alpha_x = self.Dx / (self.L*h)**2
-        # alpha_y = self.Dy / (self.L*h)**2
-        # I = sp.sparse.eye(self.n_z-2, format='csr')
-        # diag_XY = sp.sparse.diags(2*X*Y, format='csr')
-        # diag_XX = sp.sparse.diags(X**2, format='csr')
+        diag_B = sp.sparse.diags([B_left, -B_right], [0, -1],shape=(self.n_z-2, self.n_z-1), format='csr')
+        print('diag_B',diag_B.toarray())
+        B_prime_left = self.derivative_Bernoulli((V[:-1] - V[1:])*h)*y[1:]  # Derivative of B(-delta V)
+        B_prime_right = self.derivative_Bernoulli((V[1:] - V[:-1])*h)*y[:-1]  # Derivative of B(delta V)
 
-        # Jxx = alpha_x * self.Lap - (self.B+1) * I + diag_XY
-        # Jyy = alpha_y * self.Lap - diag_XX
-        # # Jyx = diag_XX
-
-        # Jxy = self.B * I - diag_XY
+        diag_B_prime = sp.sparse.diags([B_prime_left, B_prime_right],[0,-1], 
+                                       shape=(self.n_z-2, self.n_z-1), format='csr')
         
-        # J_sparse = sp.sparse.bmat([[Jxx,diag_XX],
-        #             [Jxy,Jyy]])
-        return diag_J
+        Jac_F_L = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
+
+        Jac_F_L[1:,:] = diag_B.toarray()#- (h*diag_B_prime ) @ (self.C_mat - self.C_mat_sifted )
+        # print('Jac_F_L',Jac_F_L)
+        Jac_F_K = np.roll(Jac_F_L, shift=-1, axis=0)  # Shift the Jacobian matrix to the right
+        # print('Jac_F_K',Jac_F_K)
+        return (Jac_F_K - Jac_F_L)#/(h*h)
