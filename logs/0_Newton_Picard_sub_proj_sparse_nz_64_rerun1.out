@@ -42,7 +42,7 @@ $||\Delata p || $= 7.483e-03
 Iteration 6:$||\Delta y ||$ = 4.698e-03, T = 3.43568, p = 5
 $||\Delta q ||$ = 2.329e-06
 $||\Delata p || $= 4.698e-03
-Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-08-12/Newton_Picard_sub_proj_64.txt
+Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-08-18/Newton_Picard_sub_proj_64.txt
 Analysis done
 Running on node: phlam-s-sakura.univ-lille1.fr
 MemTotal:       264626640 kB

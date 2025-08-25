@@ -1,0 +1,34 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  bruss_dflt_params.in
+Using sparse jacobian
+Iteration 0: $||\Delta y||$= 4.419e-01, T = 3.60560
+Iteration 1: $||\Delta y||$= 4.118e-01, T = 3.44721
+Iteration 2: $||\Delta y||$= 3.050e-02, T = 3.43501
+Iteration 3: $||\Delta y||$= 1.998e-04, T = 3.43497
+Iteration 4: $||\Delta y||$= 8.334e-09, T = 3.43497
+Iteration 5: $||\Delta y||$= 7.472e-13, T = 3.43497
+Precision reached within 6 iterations
+Results saved to /home/diallo/Orbit-Solutions-/Results/bruss_dflt_params.in/2025-08-18/Newton_orbit_64.txt
+Analysis done
+Running on node: phlam-s-sakura.univ-lille1.fr
+MemTotal:       264626640 kB
