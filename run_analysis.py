@@ -30,13 +30,14 @@ def run_profiling(model,n_z,orbit_method,p0,filename=None):
     phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
                 t_eval=[16*model.T_ini],
                 # dense_output=True,
-                y0=y0, method='RK45', 
+                y0=y0, method=model.method,
+                jac=Jacf, 
                 **{"rtol": 1e-5,"atol":1e-7}
                 )
     
     y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
     global orbit_finder
-    orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, "RK45",10000,model.max_iter, epsilon)
+    orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, model.method,10000,model.max_iter, epsilon)
 
     V_0 = np.eye(len(y_T))[:,:p0+model.pe]#Initial guess of the subspace
     global args_func #The arguments to pass to the orbit_finder method
@@ -59,8 +60,8 @@ def run_profiling(model,n_z,orbit_method,p0,filename=None):
     method_to_call= getattr(orbit_finder, orbit_method)
     cProfile.run('wrapper(method_to_call,**args_func)',filename)
 
-    k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = results
-    # k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args_func)
+    k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged = results
+    # k, T_by_iter, y_by_iter, Norm_B, Abs_Err = call_method(method_to_call, **args_func)
     p = pstats.Stats(filename)
     found_stat= False
     for func, stat in p.stats.items():
@@ -76,6 +77,7 @@ def run_profiling(model,n_z,orbit_method,p0,filename=None):
     # p0 = p0+2 #We may vary p accordingly to n_z rather than fixing it
     results = dict(
         orbit_method = orbit_method,
+        solv_method = model.method,
         nz = n_z,
         p0 = p0,
         pe=model.pe,
@@ -83,7 +85,10 @@ def run_profiling(model,n_z,orbit_method,p0,filename=None):
         full_sub_iter = model.full_sub_iter,
         rho = model.rho,
         n_iter = k,
-        precison = Norm_Deltay[k],
+        abs_err = Abs_Err[k],
+        rel_Err = Rel_Err[k],
+        norm_B = Norm_B[k],
+        converged = converged,
         solver_time = ivp_time,
         solver_calls = solver_calls,
         comput_time = total_time,
@@ -108,12 +113,13 @@ def run(model,n_z,orbit_method,p0,filename=None):
     phi_t = solve_ivp(fun=f,t_span=[0.0, 16*model.T_ini],
                 t_eval=[16*model.T_ini],
                 # dense_output=True,
-                y0=y0, method='RK45', 
+                y0=y0, method=model.method,
+                jac=Jacf,
                 **{"rtol": 1e-5,"atol":1e-7}
                 )
     
     y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
-    orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, "RK45",10000,model.max_iter, epsilon)
+    orbit_finder = orbit(f,y_T,model.T_ini, Jacf,2, solve_ivp, model.method, 10000,model.max_iter, epsilon)
 
     V_0 = np.eye(len(y_T))[:,:p0+model.pe]#Initial guess of the subspace
     #The arguments to pass to the orbit_finder method
@@ -135,12 +141,13 @@ def run(model,n_z,orbit_method,p0,filename=None):
     method_to_call= getattr(orbit_finder, orbit_method)
 
     start = time.time()
-    k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay = call_method(method_to_call, **args_func)
+    k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged = call_method(method_to_call, **args_func)
     end = time.time()
     total_time = end - start
                
     results = dict(
         orbit_method = orbit_method,
+        solv_method = model.method,
         nz = n_z,
         p0 = p0,
         pe=model.pe,
@@ -148,7 +155,10 @@ def run(model,n_z,orbit_method,p0,filename=None):
         full_sub_iter = model.full_sub_iter,
         rho = model.rho,
         n_iter = k,
-        precison = Norm_Deltay[k],
+        abs_err = Abs_Err[k],
+        rel_err = Rel_Err[k],
+        norm_B = Norm_B[k],
+        converged = converged,
         comput_time = total_time,
         T_star = T_by_iter[k],
     )
@@ -180,7 +190,7 @@ def prog_options():
                 Must be provided if not using the default parameter file 'bruss_dflt_params.in'."""
                       )
     parser.add_argument(
-        "-ns", "--nosave", action='store_false', help="Decide wether to save the results or not." \
+        "-ns", "--nosave", action='store_true', help="Decide wether to save the results or not." \
         " Defaut: save."
                         )
     parser.add_argument(
@@ -233,10 +243,11 @@ if __name__ == "__main__":
     filename_prof = f"{Dir_path/args.method}_nz_{args.n_z}.prof"
     file_path = Dir_path / f"{args.method}_{args.n_z}.pkl"
     res = safe_run(model,args.n_z,args.method,args.p0,filename_prof)
-    if bool(args.nosave): 
+    #Saving the results
+    if not bool(args.nosave): 
         with open(file_path, 'wb') as f:
             pickle.dump(res, f)
-        #Saving the results 
+
         file_path = f"{Dir_path/args.method}_{args.n_z}.txt"
         with open(file_path, 'w') as f:
             for item in res:
