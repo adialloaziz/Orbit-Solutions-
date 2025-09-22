@@ -1,0 +1,3 @@
+256, Error: 'optim_BrusselatorModel' object has no attribute 'method'
+
+None

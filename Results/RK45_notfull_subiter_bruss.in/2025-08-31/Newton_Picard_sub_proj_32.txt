@@ -1,0 +1,3 @@
+32,OK
+
+{'orbit_method': 'Newton_Picard_sub_proj', 'solv_method': 'RK45', 'nz': 32, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': False, 'rho': 0.5, 'n_iter': 9, 'abs_err': np.float64(0.0002218275439521756), 'rel_err': np.float64(6.716802942164605e-05), 'norm_B': np.float64(0.000503338240831623), 'converged': 1, 'comput_time': 19.93708848953247, 'T_star': np.float64(3.4345555950485824)}

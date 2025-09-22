@@ -1,0 +1,64 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  RK45_notfull_subiter_bruss.in
+Using sparse jacobian
+Iteration 0:err_abs(y)$ = 4.709e-02, T = 3.51611, p = 5
+$||err_rel(y)||$ = 1.431e-02
+$||Delta q||$ = 3.832e-02
+$||Delata p|| $= 4.014e-02
+Iteration 1:err_abs(y)$ = 9.274e-02, T = 3.26754, p = 5
+$||err_rel(y)||$ = 2.785e-02
+$||Delta q||$ = 4.014e-02
+$||Delata p|| $= 1.118e-01
+Iteration 2:err_abs(y)$ = 4.489e-02, T = 3.38837, p = 5
+$||err_rel(y)||$ = 1.353e-02
+$||Delta q||$ = 8.602e-03
+$||Delata p|| $= 3.795e-02
+Iteration 3:err_abs(y)$ = 2.594e-02, T = 3.43302, p = 5
+$||err_rel(y)||$ = 7.832e-03
+$||Delta q||$ = 9.526e-03
+$||Delata p|| $= 2.416e-02
+Iteration 4:err_abs(y)$ = 2.050e-02, T = 3.42987, p = 5
+$||err_rel(y)||$ = 6.207e-03
+$||Delta q||$ = 2.316e-03
+$||Delata p|| $= 1.967e-02
+Iteration 5:err_abs(y)$ = 4.574e-03, T = 3.44064, p = 5
+$||err_rel(y)||$ = 1.385e-03
+$||Delta q||$ = 5.035e-04
+$||Delata p|| $= 4.582e-03
+Iteration 6:err_abs(y)$ = 3.801e-03, T = 3.43988, p = 5
+$||err_rel(y)||$ = 1.151e-03
+$||Delta q||$ = 4.583e-05
+$||Delata p|| $= 3.786e-03
+Iteration 7:err_abs(y)$ = 2.028e-03, T = 3.43364, p = 5
+$||err_rel(y)||$ = 6.143e-04
+$||Delta q||$ = 1.189e-05
+$||Delata p|| $= 2.026e-03
+Iteration 8:err_abs(y)$ = 2.233e-04, T = 3.43546, p = 5
+$||err_rel(y)||$ = 6.761e-05
+$||Delta q||$ = 1.565e-05
+$||Delata p|| $= 2.203e-04
+Precision reached within 9 iterations
+Results saved to /home/diallo/Orbit-Solutions-/Results/RK45_notfull_subiter_bruss.in/2025-08-31/Newton_Picard_sub_proj_64.txt
+Analysis done
+Running on node: phlam-s-sakura.univ-lille1.fr
+MemTotal:       264626640 kB

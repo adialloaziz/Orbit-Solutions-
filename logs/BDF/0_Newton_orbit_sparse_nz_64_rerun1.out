@@ -1,0 +1,36 @@
++-----------------------------------------------------------------------------------+
+| Welcome to sakura:                                                                |
+|                                                                                   |
+| For questions on sakura HPC cluster, email phlam-sakura@univ-lille.fr             |
+|                                                                                   |
+| Documentation accessible on the WIKI page:                                        |
+| ------------------------------------------                                        |
+| [34mhttps://wikis.univ-lille.fr/phlam-hpc/(B[m                                            |
+|                                                                                   |
+| New commands to check the status of the cluster:                                  |
+| ------------------------------------------------                                  |
+| [31mcnodes(B[m           : to list the status of all nodes                                |
+| [31mcnodes -f(B[m        : to check for free nodes                                        |
+| [31mcheckjob <jobid>(B[m : to check the status of your job (especially when not running ! |
+| [31mshowstart <jobid>(B[m: to check when your job is expected to start when not running ! |
+| [31mcdjob <jobid>(B[m    : to move to the <jobid> directory                               |
+| [31mcdtmp <jobid>(B[m    : to move to the <jobid> working directory on node               |
+| [31mrmtmp <jobid>(B[m    : removing the <jobid> working directory on node                 |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+
+Loaded file  BDF_bruss_dflt_params.in
+Using sparse jacobian
+Iteration 0:err_abs(y)$ = 5.877e-02, T = 3.60556
+$|| err_rel(y) ||$ = 1.784e-02
+Iteration 1:err_abs(y)$ = 5.569e-02, T = 3.44720
+$|| err_rel(y) ||$ = 1.687e-02
+Iteration 2:err_abs(y)$ = 4.779e-03, T = 3.43501
+$|| err_rel(y) ||$ = 1.447e-03
+Iteration 3:err_abs(y)$ = 2.742e-05, T = 3.43497
+$|| err_rel(y) ||$ = 8.302e-06
+Precision reached within 4 iterations
+Results saved to /home/diallo/Orbit-Solutions-/Results/BDF_bruss_dflt_params.in/2025-08-26/Newton_orbit_64.txt
+Analysis done
+Running on node: phlam-s-sakura.univ-lille1.fr
+MemTotal:       264626640 kB

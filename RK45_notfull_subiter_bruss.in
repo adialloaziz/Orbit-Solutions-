@@ -1,0 +1,27 @@
+num_test=1
+Dx=0.008
+Dy=0.004
+L=1.
+z_L=1.0 
+A=2
+B=5.45  
+n_z=30
+T_ini=3.1
+#T_ini=3.4 for EVA
+precision=1e-4
+#precision=1e-9 pour le test du temps de calcul en fonction de n-z
+out_dir=./Results/brusslator/
+Max_iter=50
+method=RK45
+#PARMETERS FOR NEWTON-PICARD Method
+rho=0.5
+picard_iter=2
+full_sub_iter=0
+#0=False: subsp_iter will be muted to 1 except for the first NP iteration
+subsp_iter=5
+p0=5
+pe=4
+#if fixed time step solver
+solver_steps=100
+#X_ini=A+0.1*sin(pi*(z/z_L))
+#Y_ini=B/A+0.1*sin(pi*(z/z_L))

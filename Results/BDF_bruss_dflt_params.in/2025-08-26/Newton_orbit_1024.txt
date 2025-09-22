@@ -1,0 +1,3 @@
+1024, Error: Unable to allocate 127. TiB for an array with shape (4179980, 4179980) and data type float64
+
+None
