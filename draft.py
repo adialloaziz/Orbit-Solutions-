@@ -336,3 +336,105 @@ def NP_project_anim(self, f, y0, T_0, Ve_0, p0, pe, rho, Jacf, Max_iter, subsp_i
     for i in range(k):
         os.remove(f"frame_{i}.png")
     return k, T_by_iter, y_by_iter, Norm_B, Norm_Deltay
+
+
+def V(self, z, rho):
+        "The potential function"
+        _,_, h = self.mesh1D
+        
+        # return np.ones_like(z)
+        return z*z/2 + sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
+        # return z*z/2 #+ np.trapezoid(self.Haissinski_kernel(z) * rho)
+    
+    def mesh1D(self):
+        "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
+        h = (self.xmax - self.xmin) / (self.n_z - 1)
+        x = np.linspace(self.xmin, self.xmax, self.n_z)
+        # Centers of the mesh cells
+        x_centers = x[:-1] + h/2
+        return (x, x_centers, h)
+    
+    def flux(self, rho):
+        "Compute the flux of the density rho"
+        #y = rho[:,0] if rho.ndim > 1 else rho
+        x, x_centers, h = self.mesh1D
+        V = self.V(x_centers, rho)  # Potential at the center of the cells
+        F_L = np.zeros_like(x_centers)  # Containining all the flux values
+        V_diff = V[1:] - V[:-1]
+        #No flux on the boundaries
+        F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
+        return F_L
+    
+    def dydt(self, t, rho):
+        "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
+        #We suppose a uniform mesh in the interval [xmin, xmax]
+        x, x_centers,h = self.mesh1D  # Get the mesh and centers
+        # V = self.V(x_centers, rho)  # Potential at the center of the cells
+        # # F_K = np.zeros(self.n_z)  # Force term K
+        # F_K = np.zeros_like(x_centers)  # Force term K
+        F_L = np.zeros_like(x_centers)  
+        # # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
+        # V_diff = V[1:] - V[:-1]
+        # F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1] 
+        # F_K[:-1] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
+        F_L = self.flux(rho)  # Flux of the density y
+
+        # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
+        F_K = np.roll(F_L, shift=-1)
+        dydt = (F_K - F_L) / (h*h) 
+        return dydt
+    
+    # def jacobian(self, t, rho):
+    #     "Jacobian of the right hand side of the Mckean-Vlasov equation"
+    #     _, x_centers, h = self.mesh1D  # Get the mesh and centers
+    #     V = self.V(x_centers, rho)#y[1:-1])  # Potential at the center of the cells
+    #     V_diff = V[1:] - V[:-1]
+    #     B_left = self.Bernoulli(-V_diff*h)
+    #     B_right = self.Bernoulli(V_diff*h)
+    #     J_linear = sp.sparse.diags([0], shape=(self.n_z-1, self.n_z-1), format='csr')  # Initialize the Jacobian matrix
+    #     # B1 = np.concatenate([[0],B_left[:-1],[0]]) + np.concatenate([[0],B_right[1:],[0]])
+    #     # M = sp.sparse.diags([0], shape=(self.n_z-3, self.n_z-1), format='csr')
+    #     # M.setdiag(-(B_right[1:] + B_left[:-1]),k=0)
+    #     # M.setdiag(-(B_right[1:] + B_left[:-1]),k=0)
+
+    #     #Only the two first components of the first row are non zero
+    #     # J_linear[0, 0] = -self.Bernoulli((V[1]-V[0])*h)
+    #     # J_linear[0, 1] = self.Bernoulli((V[0]-V[1])*h)
+    #     #Only the two last components of the last row are non zero
+    #     # diag_J = np.concatenate([[0],B_left]) + np.concatenate([B_right,[0]])
+    #     diag_J = np.concatenate([[0],B_left[:-1],[0]]) + np.concatenate([[0],B_right[1:],[0]])
+
+    #     diag_J[0] = B_right[0]
+    #     diag_J[-1] = -B_left[-1]
+    #     lower_diag_J = B_right.copy()
+    #     lower_diag_J[-1] *=-1
+    #     # J_linear[-1, -2] = -self.Bernoulli((V[-1]-V[-2])*h)
+    #     # J_linear[-1, -1] = self.Bernoulli((V[-2]-V[-1])*h)
+
+    #     J_linear.setdiag(-diag_J,k=0)
+    #     J_linear.setdiag(lower_diag_J,k=-1)
+    #     J_linear.setdiag(B_left,k=1)
+
+         
+    #     B_prime_left = self.derivative_Bernoulli(-V_diff*h)
+    #     B_prime_right = self.derivative_Bernoulli(V_diff*h)
+    #     # B1 = np.concatenate([[-B_prime_right[0]],B_prime_left[:-1],[0]]) - np.concatenate([[0],B_prime_right[1:],[-B_prime_left[-1]]])
+    
+    #     # M = sp.sparse.diags(B1*rho, shape=(self.n_z-1, self.n_z-1), format='csr')
+    #     # M1 = sp.sparse.diags([B_prime_left,B_prime_right],[-1,1], shape=(self.n_z-1, self.n_z-1), format='csr')        
+        
+    #     J_non_lin = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
+    #     J_non_lin[0,:] = -h*(B_prime_left[0]*rho[1] + B_prime_right[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
+    #     J_non_lin[-1,:] = -h*(B_prime_left[-1]*rho[-1] + B_prime_right[-1]*rho[-2])*(self.C_mat[1,:] - self.C_mat[0,:])
+    #     # print('Jnonlin 0 shape', J_non_lin[0,:].shape)
+
+    #     for i in range(1,self.n_z-3):
+    #         s = -h*(B_prime_left[i+1]*rho[i+1] + B_prime_right[i+1]*rho[i])*(self.C_mat[i+1,:] - self.C_mat[i,:])
+
+    #         J_non_lin[i,:] = s+h*(B_prime_left[i]*rho[i] + B_prime_right[i]*rho[i-1])*(self.C_mat[i,:] - self.C_mat[i-1,:])
+
+    #     # Jac_F_L[1:,:] = diag_B.toarray()#- (h*diag_B_prime ) @ (self.C_mat - self.C_mat_sifted )
+    #     # print('Jac_F_L',Jac_F_L)
+    #     # Jac_F_K = np.roll(Jac_F_L, shift=-1, axis=0)  # Shift the Jacobian matrix to the right
+    #     # print('Jac_F_K',Jac_F_K)
+    #     return (J_linear + J_non_lin)/(h*h)

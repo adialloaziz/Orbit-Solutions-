@@ -1,3 +1,7 @@
 16,OK
 
+<<<<<<< HEAD
 {'orbit_method': 'Newton_orbit', 'solv_method': 'BDF', 'nz': 16, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': True, 'rho': 0.5, 'n_iter': 3, 'abs_err': np.float64(2.5458096425685442e-05), 'rel_err': np.float64(7.702250169587474e-06), 'norm_B': np.float64(3.1940783115302906e-05), 'converged': 1, 'comput_time': 1154.6629173755646, 'T_star': np.float64(3.4343402443589865)}
+=======
+{'orbit_method': 'Newton_orbit', 'solv_method': 'BDF', 'nz': 16, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': True, 'rho': 0.5, 'n_iter': 3, 'abs_err': np.float64(2.545809642267743e-05), 'rel_err': np.float64(7.702250168593159e-06), 'norm_B': np.float64(3.1940783115302906e-05), 'converged': 1, 'comput_time': 7.189660310745239, 'T_star': np.float64(3.4343402443589848)}
+>>>>>>> bf2abb8f11f31b471c7602644c7ff186a11cd831
