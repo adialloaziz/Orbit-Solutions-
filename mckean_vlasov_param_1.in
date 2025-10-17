@@ -4,18 +4,20 @@ I=1
 xmin=-15.0
 xmax=15.0
 scal=1 
-n_z=100
-T_ini=50
-precision=1e-9
+n_z=500
+T_ini=3.0
+precision=1e-4
 out_dir=./Results/mckean_vlasov/
-Max_iter=7
+Max_iter=30
+method=BDF
 #PARMETERS FOR NEWTON-PICARD Method
 rho=0.5
 picard_iter=2
+full_sub_iter=0
+#0=False: subsp_iter will be muted to 1 except for the first NP iteration
 subsp_iter=5
-p0=5
-pe=4
+p0=7
+pe=9
 #if fixed time step solver
 solver_steps=100
-#X_ini=A+0.1*sin(pi*(z/z_L))
-#Y_ini=B/A+0.1*sin(pi*(z/z_L))
+

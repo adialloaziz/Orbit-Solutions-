@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import solve, schur
+from scipy.linalg import solve, lstsq, schur
 from scipy.integrate import solve_ivp
 # from scipy.interpolate import interp1d
 from scipy.sparse.linalg import eigs
@@ -57,6 +57,7 @@ class orbit:
         M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
         dM_dt = self.Jacf(t,Y_M[:self.dim]) @ M  # Compute the matrix derivative
         return np.concatenate([self.f(t, Y_M[:self.dim]),dM_dt.flatten(order = 'F')])
+    
     def monodromy_mult(self,y, T, v, method = 1, epsilon = 1e-6):
         """
             M*v Matrix-vector multiplication using 
@@ -109,8 +110,7 @@ class orbit:
 
         def Mv_system(t, Y_MV):
             # Solving numerically the initial value problem (dMv/dt = (Jacf*MV, MV(0) = V of dim N x m)
-
-            dMV_dt = self.Jacf(t,Y_MV[:self.dim]) @ Y_MV[self.dim:]  # 
+            dMV_dt = self.Jacf(t,Y_MV[:self.dim]) @ Y_MV[self.dim:]
             return np.concatenate([self.f(t, Y_MV[:self.dim]),dMV_dt])
          
         y_v0 = np.concatenate([y, v])
@@ -310,10 +310,60 @@ class orbit:
         XX = solve(Mat, -B)
         Delta_p = Vp @ XX[:Vp.shape[1]] 
         Delta_T = XX[-1]
-
-
         
         return Delta_p, Delta_T, B
+    
+    def Newton_correction_mass(self, y,phi_T, T, Vp, Wp, Delta_q, y_prev,H):
+        """
+        Perform Newton correction for the orbit finding method with mass conservation.
+        Args:
+            y: Current state vector.
+            phi_T: Solution at time T.
+            T: Time period.
+            Vp: Basis vectors for the subspace.
+            Wp: Monodromy matrix applied to Vp (from the last iteration of the subspace iteration).
+            Delta_q: Picard correction vector.
+            y_prev: Previous state vector for phase condition.
+            h: Spatial step size for mass conservation.
+
+        Returns:
+            Delta_p: Corrected state vector in the dominant subspace after Newton iteration.
+            Delta_T: Corrected time period.
+            B: Right-hand side of the linear system.
+        """
+        Sp = Vp.T @ Wp 
+        # Phase condition
+        d11 = 0
+        c1 = self.f(T, y_prev)
+        s = (y + Delta_q - y_prev) @ c1
+        b1 = Vp.T @ self.f(T, phi_T)
+        # Mass conservation condition
+        m = H @ (y - y_prev)
+        c2 = H #derivative wrt y
+        d22 = 0 #derivative wrt T
+
+        # Build augmented linear system [A | b]
+        top = np.hstack((Sp - np.eye(Vp.shape[1]), b1.reshape(-1, 1)))
+        middle = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
+        
+        bottom = np.hstack(((c2.T @ Vp).reshape(1,-1), np.array([[d22]])))
+
+        Mat = np.vstack((top, middle, bottom))
+        # Right-hand side (Taylor approx)
+        sol = self.ode_solver(fun=self.f, t_span=[0.0, T], y0=y + Delta_q,
+                              t_eval=[T], method=self.method,
+                              jac=self.Jacf,
+                              rtol=1e-7, atol=1e-9)
+        
+        r_y0_deltaq = sol.y[:, -1] - y
+        B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s]),np.array([m])))
+
+        XX, residues,rank,sing_val = lstsq(Mat, -B)
+        Delta_p = Vp @ XX[:Vp.shape[1]]
+        Delta_T = XX[-1]
+
+        return Delta_p, Delta_T, B
+
 
     def integ_monodromy(self,y0,M0, T):
         # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
@@ -324,20 +374,24 @@ class orbit:
         Y_M = np.concatenate([y0, M0.flatten(order='F')]) #Initial condition for the ODE system
         big_sol= self.ode_solver(fun = self.big_system, t_span= (0.0,T),y0=Y_M,
                             t_eval=[T],
-                            method=self.method,
+                            method="RK45",
                             rtol = 1e-7, atol = 1e-9) #It's a function of t
         
         # phi_T = big_sol.y[:self.dim,-1]
         monodromy = big_sol.y[self.dim:][:,-1] #We take M(T)
 
         monodromy = monodromy.reshape(self.dim,self.dim, order = "F") #Back to the square matrix format
-        return big_sol.y[:self.dim,-1], monodromy   
+        return big_sol.y[:self.dim,-1], monodromy  
+
+
     def Newton_orbit(self,y0,T_0, Max_iter, epsilon,phase_cond = 2):
+
         #________________________________INITIALISATION_________________________________
         y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
 
         y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
         Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+        mass = np.zeros((Max_iter))
         Rel_Err = np.zeros((Max_iter))
         I = np.eye(self.dim)
         #______________________________Newton iteration loop________________
@@ -366,7 +420,8 @@ class orbit:
             
             #Right hand side concatenation
             B = np.concatenate((phi_T - y_star, np.array([s])))   #np.array([s(T_star,y_star)])))
-            XX = solve(Mat,-B) #Contain Delta_X and Delta_T
+            # XX = solve(Mat,-B) #Contain Delta_X and Delta_T
+            XX, residues,rank,sing_val = lstsq(Mat,-B) #Contain Delta_X and Delta_T
             Delta_y = XX[:self.dim]
             Delta_T = XX[-1]
             
@@ -377,7 +432,10 @@ class orbit:
             Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
             Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
             Norm_B[k] = np.linalg.norm(B, ord=np.inf)
-            y_by_iter[k,:] = y_star                    
+            y_by_iter[k,:] = y_star
+            mass[k] = np.sum(y_star, axis=0)
+
+            print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
             # y_by_iter[k,:] = y_star
             T_by_iter[k] = T_star
             print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}")
@@ -389,7 +447,79 @@ class orbit:
             else: 
                 converged = 0
 
-        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+    
+    def Newton_mass_conserv(self,y0,T_0, Max_iter, epsilon,h=1):
+        #h is the spatial step size
+        #________________________________INITIALISATION_________________________________
+        y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
+
+        y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
+        Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+        mass = np.zeros((Max_iter))
+        Rel_Err = np.zeros((Max_iter))
+        I = np.eye(self.dim)
+        H = h*np.ones_like(y_star)
+        #______________________________Newton iteration loop________________
+        for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
+            
+            #Soving the whole system over one period
+            phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
+
+        #Selecting the phase-condition
+        #The orthogonality phase condition is imposed
+            d = 0
+            c = self.f(T_star,y_prev)
+            s = (y_star - y_prev)@self.f(T_star,y_prev)
+            bb = self.f(T_star, phi_T)
+
+            #Mass conservation condition
+            m = H @ (y_star - y_prev)
+
+            #Concat the whole matrix
+            top = np.hstack((monodromy - I, bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+            #
+            middle = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+            j = c.reshape(1,-1)
+            print('j shape:', j.shape)
+            #Mass conservation condition
+            #H.Jacf with H = [1,1,...,1] 
+            # H = h*np.ones((1,self.dim))
+            
+            # A31 = H @ I
+            bottom = np.hstack((H.reshape(1,-1) ,np.array([[0]]))) #Horizontal stacking of A31=H.Jacf and A32=0
+            Mat = np.vstack((top, middle,bottom))  # Vertical stacking of the three rows
+
+            #Right hand side concatenation
+            B = np.concatenate((phi_T - y_star, np.array([s]), np.array([m])))   #np.array([s(T_star,y_star)])))
+            XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelsy') #Contain Delta_X and Delta_T
+            Delta_y = XX[:self.dim]
+            Delta_T = XX[-1]
+            
+            #Updating
+            y_prev = y_star
+            y_star += Delta_y
+            T_star += Delta_T
+            Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+            Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+            Norm_B[k] = np.linalg.norm(B, ord=np.inf)
+            y_by_iter[k,:] = y_star
+            mass[k] = h*np.sum(y_star, axis=0)
+
+            print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+            # y_by_iter[k,:] = y_star
+            T_by_iter[k] = T_star
+            print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}")
+            print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}")
+            if Rel_Err[k] <= epsilon:
+                print(f"Precision reached within {k+1} iterations")
+                converged = 1
+                break
+            else: 
+                converged = 0
+
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass            
+
 
     def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5):
         """----------Initialization--------"""
@@ -658,6 +788,83 @@ class orbit:
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
 
+    def NP_mass_conserv(self,y0,T_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
+        #h is the spatial step size
+        """----------Initialization--------"""
+        y_star = y0.copy()
+        y_prev = y0.copy()
+        T_star = T_0
+        p = p0
+        y_by_iter = np.zeros((Max_iter, self.dim))
+        T_by_iter = np.zeros(Max_iter)
+        Norm_B = np.zeros(Max_iter)
+        mass = np.zeros((Max_iter))
+        Abs_Err = np.zeros(Max_iter)
+        Rel_Err = np.zeros(Max_iter)
+        Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
+        p = p0
+        I = np.eye(self.dim)
+        H = h*np.ones_like(y_star)
+        """----------------Shooting loop---------------------------"""
+        for k in range(Max_iter):
+            # Step 1: Solve the ODE to get phi(T)
+            phi_interp = self.ode_solver(
+                fun=self.f, t_span=[0.0, T_star], t_eval=[T_star], y0=y_star,
+                method=self.method, rtol=1e-7, atol=1e-9, jac=self.Jacf
+            )
+            phi_T = phi_interp.y[:, -1].copy()
+            #________________________________________________________________#
+            """------Step 2: Compute dominant subspace via subspace iteration with projection"""
+            #Deciding whether to use the full subspace iteration or the subspace iteration with projection
+            nu_sub = subsp_iter if (full_sub_iter or k==0) else 1
+            Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star,rho,p0, pe, nu_sub, epsilon)
+            p = max(p0, p_1)  # Ensure p > 0
+            Vp = Ve @ Ye[:, :p]
+            #________________________________________________________________#
+            """------Step 3: Picard correction (NPGS(l=2))-----------------"""
+
+            Delta_q = self.picard_correction(y = y_star,T = T_star,r = phi_T-y_star, Vp=Vp,l=l)
+            
+            #_________________________________________________________________#
+            """------Step 4: Newton correction------------------------------"""
+            # Wp = M @ Vp 
+            Wp = We[:,:p]
+            Delta_p , Delta_T, B = self.Newton_correction_mass(
+                y = y_star, phi_T=phi_T ,T = T_star, Vp = Vp, Wp = Wp, 
+                Delta_q = Delta_q, y_prev = y_prev, H = H
+            )
+
+
+            Delta_y = Delta_q + Delta_p
+            #________________________________________________________________#
+            """------Step 6: Update guess----------------------------------"""
+            y_prev = y_star
+            y_star += Delta_y
+            T_star += Delta_T
+            #________________________________________________________________#
+            """----Step 7: Convergence check-------------------------------"""
+            y_by_iter[k, :] = y_star
+            mass[k] = h*np.sum(y_star, axis=0)
+            Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+            Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+            T_by_iter[k] = T_star
+            Norm_B[k] = np.linalg.norm(B,ord=np.inf)
+            
+            print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+            print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}, p = {p}")
+            print(f"$||err_rel(y)||$ = {Rel_Err[k]:.3e}")
+            print(f"$||Delta q||$ = {np.linalg.norm(Delta_q,ord=np.inf):.3e}")
+            print(f"$||Delata p|| $= {np.linalg.norm(Delta_p,ord=np.inf):.3e}")
+            if Rel_Err[k] <= epsilon:
+                print(f"Precision reached within {k+1} iterations")
+                converged = 1
+                break
+            else: 
+                converged = 0
+        # Final monodromy matrix computation
+        # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+
 class BrusselatorModel:
     def __init__(self, ficname):
         self.ficname = ficname
@@ -914,15 +1121,26 @@ class Mckean_Vlasov:
     def __init__(self, ficname):
         self.ficname = ficname
         self.read_params()
-        self.mesh1D = self.mesh1D()  # Initialize the mesh
+        self.mesh1D = self.mesh_1D()  # Initialize the mesh
         # self.M_sift = self.M_sifter(self.n_z)  # Create the sifting matrix for the mesh size n_z 
-        self.C_mat = self.Conv_mat()  # Precompute the convolution matrix for the Haissinski kernel
+        self.C_mat =self.Conv_mat()  # Precompute the convolution matrix for the Haissinski kernel
         # self.C_mat_sifted = np.roll(self.C_mat, -1, axis=0)  # Shift the convolution matrix to match the mesh centers
     # def M_sifter(self, n):
     #     M = sp.sparse.diags([-1, 1], [0, 1], shape=(n-1,n),format='csr')  # Sifting matrix for the mesh
 
         # return M
-       
+
+    def update_params(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Unknown parameter: {key}")
+        # Recompute dependent attributes if necessary
+        if 'n_z' in kwargs:
+            self.mesh1D = self.mesh_1D()  # Update the mesh if n_z changes
+            self.C_mat = self.Conv_mat()  # Update the convolution matrix if n_z changes
+
     def read_params(self): 
         with open(self.ficname, 'r') as fic:
             for line in fic:
@@ -974,6 +1192,8 @@ class Mckean_Vlasov:
                         self.rho = float(res)
                     elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
                         self.picard_iter = int(res)
+                    elif var == 'full_sub_iter':
+                        self.full_sub_iter = bool(int(res))
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
 
@@ -987,26 +1207,26 @@ class Mckean_Vlasov:
     
     def Bernoulli(self,z):
         "The Bernoulli function"
-        return np.where(np.abs(z)<=1e-8,1-z/2+z*z/12-(z**4)/720, z/(np.exp(z)-1))
+        return np.where(np.abs(z)<=1e-5,1-z/2+z*z/12-(z**4)/720, z/(np.exp(z)-1))
 
     def derivative_Bernoulli(self, z):
         "The derivative of the Bernoulli function"
-        return np.where(np.abs(z)<=1e-8,-1/2+z/6-(z**3)/180, (np.exp(z)*(1-z)-1)/(np.exp(z) - 1)**2)
+        return np.where(np.abs(z)<=1e-5,-1/2+z/6-(z**3)/180, (np.exp(z)*(1-z)-1)/(np.exp(z) - 1)**2)
     
     def Haissinski_kernel(self, z):
         "The kernel function: Haissinski kernel"
-        y = 0*z
+        # y = 0*z
         # We only compute the kernel for positive z
         denom = np.sinh(2 * np.asinh(z))
         denom = np.where(np.abs(denom) < 1e-8,1, denom)  # Replace near-zero denominators with 1
-        y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
-        return y
+        # y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
+        return np.where(z<1e-5,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
+    
     def Conv_mat(self):
         "The convolution matrix for the Haissinski kernel"
         _,z, h = self.mesh1D  # Get the mesh and centers
         #Convolution matrix
         return h*sp.linalg.convolution_matrix(self.Haissinski_kernel(z), len(z), mode='same') 
-        #Alternative way without using the toeplitz function
 
         # C_mat = np.zeros((len(z), len(z))) # Initialize a matrix to hold the kernel values
         # for i in range(len(z)):
@@ -1016,13 +1236,13 @@ class Mckean_Vlasov:
     def V(self, z, rho):
         "The potential function"
         _,_, h = self.mesh1D
-        # return  z*z/2 + (self.C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
+        return  z*z/2 + (self.C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
         # return np.ones_like(z)
         # y = rho[:,0] if rho.ndim > 1 else rho
-        return z*z/2 + h*sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
+        # return z*z/2 + h*sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
         # return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho)
     
-    def mesh1D(self):
+    def mesh_1D(self):
         "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
         h = (self.xmax - self.xmin) / (self.n_z - 1)
         x = np.linspace(self.xmin, self.xmax, self.n_z)
@@ -1033,67 +1253,129 @@ class Mckean_Vlasov:
     def flux(self, rho):
         "Compute the flux of the density rho"
         #y = rho[:,0] if rho.ndim > 1 else rho
-        x, x_centers, h = self.mesh1D
+        _, x_centers, h = self.mesh1D
         V = self.V(x_centers, rho)  # Potential at the center of the cells
+        V_diff = V[1:] - V[:-1]
+        B_m = self.Bernoulli(-V_diff)
+        B_p = self.Bernoulli(V_diff)
         F_L = np.zeros_like(x_centers)  # Containining all the flux values
         #No flux on the boundaries
-        F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*rho[1:] - self.Bernoulli((V[1:] - V[:-1]))*rho[:-1]
-        return F_L
+        F_L[1:] = B_m*rho[1:] - B_p*rho[:-1]
+        return F_L/(h*h)  # Flux of the density rho divided by h^2
     
     def dydt(self, t, rho):
         "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
         #We suppose a uniform mesh in the interval [xmin, xmax]
-        x, x_centers,h = self.mesh1D  # Get the mesh and centers
-        V = self.V(x_centers, rho)  # Potential at the center of the cells
-        # F_K = np.zeros(self.n_z)  # Force term K
-        F_K = np.zeros_like(x_centers)  # Force term K
-        F_L = np.zeros_like(x_centers)  
-        # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
+        # _, x_centers,h = self.mesh1D  # Get the mesh and centers
+        # V = self.V(x_centers, rho)  # Potential at the center of the cells
+        # # F_K = np.zeros(self.n_z)  # Force term K
+        # F_K = np.zeros_like(x_centers)  # Force term K
+        # F_L = np.zeros_like(x_centers)  
+        # # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
 
-        F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*rho[1:] - self.Bernoulli((V[1:] - V[:-1]))*rho[:-1] 
-        F_K[:-1] = self.Bernoulli((V[:-1] - V[1:]))*rho[1:] - self.Bernoulli((V[1:] - V[:-1]))*rho[:-1]
-        # F_L = self.flux(rho)  # Flux of the density y
+        # F_L[1:] = self.Bernoulli((V[:-1] - V[1:]))*rho[1:] - self.Bernoulli((V[1:] - V[:-1]))*rho[:-1] 
+        # F_K[:-1] = self.Bernoulli((V[:-1] - V[1:]))*rho[1:] - self.Bernoulli((V[1:] - V[:-1]))*rho[:-1]
+        F_L = self.flux(rho)  # Flux of the density y
 
         # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
         # F_K = np.roll(F_L, shift=-1)
-        dydt = (F_K - F_L) / (h*h)  # Sifting matrix to apply the finite volume scheme
+        dydt = (np.roll(F_L, shift=-1) - F_L) # Sifting matrix to apply the finite volume scheme
         return dydt
     
     def jacobian(self, t, rho):
-        "Jacobian of the right hand side of the Mckean-Vlasov equation"
-        _, x_centers, h = self.mesh1D  # Get the mesh and centers
-        V = self.V(x_centers, rho) # Potential at the center of the cells
-        V_diff = V[1:] - V[:-1]
+        """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+        _, x_centers, h = self.mesh1D
+        n = self.n_z - 1
+        h_sq = h * h
+
+        # Compute potential and differences
+        V = self.V(x_centers, rho)
+        V_diff = np.diff(V)
+
+        # Compute Bernoulli functions
         B_m = self.Bernoulli(-V_diff)
         B_p = self.Bernoulli(V_diff)
-        #Only the two first components of the first row are non zero
-        
-        #Only the two last components of the last row are non zero
 
-        diag_J = np.concatenate([[-B_p[0]],-(B_m[:-1]+B_p[1:]),[-B_m[-1]]])
+        # Build linear part diagonal elements
+        diag_J = np.empty(n)
+        diag_J[0] = -B_p[0]
+        diag_J[1:-1] = -(B_m[:-1] + B_p[1:])
+        diag_J[-1] = -B_m[-1]
 
-        J_linear = sp.sparse.diags([B_p, diag_J, B_m ],[-1,0,1], shape=(self.n_z-1, self.n_z-1), format='csr')
-        
+        # Create linear part sparse of the Jacobian
+        J_linear = sp.sparse.diags(
+            [B_p, diag_J, B_m],
+            [-1, 0, 1],
+            shape=(n, n),
+            format='csr'
+        )
 
+        # Compute nonlinear flux contribution
         B_prime_m = self.derivative_Bernoulli(-V_diff)
         B_prime_p = self.derivative_Bernoulli(V_diff)
-        # B1 = np.concatenate([[-B_prime_right[0]],B_prime_left[:-1],[0]]) - np.concatenate([[0],B_prime_right[1:],[-B_prime_left[-1]]])
-    
-        # M = sp.sparse.diags(B1*rho, shape=(self.n_z-1, self.n_z-1), format='csr')
-        # M1 = sp.sparse.diags([B_prime_left,B_prime_right],[-1,1], shape=(self.n_z-1, self.n_z-1), format='csr')        
+             
         
         J_non_lin = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
-        J_non_lin[0,:] = -h*(B_prime_m[0]*rho[1] + B_prime_p[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
-        J_non_lin[-1,:] = h*(B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*(self.C_mat[-1,:] - self.C_mat[-2,:])
-        # print('Jnonlin 0 shape', J_non_lin[0,:].shape)
+        J_non_lin[0,:] = -(B_prime_m[0]*rho[1] + B_prime_p[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
 
-        for i in range(1,self.n_z-3):
-            s = (-B_prime_m[i+1]*rho[i+1] - B_prime_p[i+1]*rho[i])*(self.C_mat[i+1,:] - self.C_mat[i,:])
+        J_non_lin[-1,:] = (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*(self.C_mat[-1,:] - self.C_mat[-2,:])
+        
+        for i in range(1,self.n_z-2):
+            flux_p = -(B_prime_m[i]*rho[i+1] + B_prime_p[i]*rho[i])*(self.C_mat[i+1,:] - self.C_mat[i,:])
 
-            J_non_lin[i,:] = s+(B_prime_m[i]*rho[i] + B_prime_p[i]*rho[i-1])*(self.C_mat[i,:] - self.C_mat[i-1,:])
+            flux_m = (B_prime_m[i-1]*rho[i] + B_prime_p[i-1]*rho[i-1])*(self.C_mat[i,:] - self.C_mat[i-1,:])
 
-        # Jac_F_L[1:,:] = diag_B.toarray()#- (h*diag_B_prime ) @ (self.C_mat - self.C_mat_sifted )
-        # print('Jac_F_L',Jac_F_L)
-        # Jac_F_K = np.roll(Jac_F_L, shift=-1, axis=0)  # Shift the Jacobian matrix to the right
-        # print('Jac_F_K',Jac_F_K)
-        return (J_linear+J_non_lin)/(h*h)
+
+            J_non_lin[i,:] = flux_p + flux_m
+
+        return np.asarray((J_linear +J_non_lin))/h_sq
+    
+
+    def jacobian_optim(self, t, rho):
+        """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+        _, x_centers, h = self.mesh1D
+        n = self.n_z - 1
+        h_sq = h * h
+
+        # Compute potential and differences
+        V = self.V(x_centers, rho)
+        V_diff = np.diff(V)
+
+        # Compute Bernoulli functions
+        B_m = self.Bernoulli(-V_diff)
+        B_p = self.Bernoulli(V_diff)
+
+        # Build linear part diagonal elements
+        diag_J = np.empty(n)
+        diag_J[0] = -B_p[0]
+        diag_J[1:-1] = -(B_m[:-1] + B_p[1:])
+        diag_J[-1] = -B_m[-1]
+
+        # Create sparse linear Jacobian
+        J_linear = sp.sparse.diags(
+            [B_p, diag_J, B_m],
+            [-1, 0, 1],
+            shape=(n, n),
+            format='csr'
+        )
+
+        # Compute nonlinear flux contribution
+        B_prime_m = self.derivative_Bernoulli(-V_diff)
+        B_prime_p = self.derivative_Bernoulli(V_diff)
+
+        # Compute convolution difference efficiently
+        Convol_dif = np.diff(self.C_mat, axis=0, prepend=0)
+        
+        # Compute diagonal for flux derivatives
+        temp = B_prime_m * rho[1:] + B_prime_p * rho[:-1]
+        temp = np.append(temp, 0)
+        
+        # Apply diagonal and compute flux derivatives
+        flux_p_deriv = -temp[:, np.newaxis] * Convol_dif
+        flux_m_deriv = np.roll(flux_p_deriv, shift=1, axis=0)
+        
+        # Combine components
+        return np.asarray((J_linear.to_array() + flux_p_deriv - flux_m_deriv)) / h_sq
+        
+
+
