@@ -1,23 +1,26 @@
 num_test=2
-D=1
-I=1
+D=1.0
+I=1.0
 xmin=-15.0
 xmax=15.0
 scal=1 
-n_z=500
+n_z=200
+m0=30.0
+#T_ini=2.97
 T_ini=3.0
-precision=1e-4
+
+precision=1e-9
 out_dir=./Results/mckean_vlasov/
 Max_iter=30
 method=BDF
 #PARMETERS FOR NEWTON-PICARD Method
 rho=0.5
 picard_iter=2
-full_sub_iter=0
+full_sub_iter=1
 #0=False: subsp_iter will be muted to 1 except for the first NP iteration
 subsp_iter=5
-p0=7
-pe=9
+p0=5
+pe=5
 #if fixed time step solver
 solver_steps=100
 
