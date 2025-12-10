@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 
 def sorted_schur(Se):
-    Re, Ye = schur(Se, output='real')
+    Re, Ye = schur(Se, output='real') # type: ignore
     #Sorting according to the decreasing in modulus of the eigenvalues
     eigenvalues,_ = np.linalg.eig(Re)
     sorted_indices = np.argsort(np.abs(eigenvalues))[::-1]  # Sorting by decreasing modulus value
@@ -58,7 +58,43 @@ class orbit:
         M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
         dM_dt = self.Jacf(t,Y_M[:self.dim]) @ M  # Compute the matrix derivative
         return np.concatenate([self.f(t, Y_M[:self.dim]),dM_dt.flatten(order = 'F')])
+    def integ_monodromy(self,y0,M0, T):
+        # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
+        # monodromy = np.eye(self.dim) #Initialisation of the monodromy matrix
+
+        # Y_M[:self.dim] = y0
+        # Y_M[self.dim:] = M0.flatten(order='F')
+        Y_M = np.concatenate([y0, M0.flatten(order='F')]) #Initial condition for the ODE system
+        big_sol= self.ode_solver(fun = self.big_system, t_span= (0.0,T),y0=Y_M,
+                            t_eval=[T],
+                            method="RK45",
+                            rtol = 1e-7, atol = 1e-9) #It's a function of t
+        
+        # phi_T = big_sol.y[:self.dim,-1]
+        monodromy = big_sol.y[self.dim:][:,-1] #We take M(T)
+
+        monodromy = monodromy.reshape(self.dim,self.dim, order = "F") #Back to the square matrix format
+        return big_sol.y[:self.dim,-1], monodromy
+
+
+    def sensitivity_system(self,t, Y_S, f_param=0):
+        # Solving numerically the initial value problem (dy/dt,dS/dt = (f(t,y),Jacf*S)
+        #S is the derivative of the solution wrt a parameter, it's a vector of size dim
+        S = Y_S[self.dim:]
+        dS_dt = self.Jacf(t,Y_S[:self.dim]) @ S  +  f_param# Compute the vector derivative
+        return np.concatenate([self.f(t, Y_S[:self.dim]),dS_dt])
     
+    def integ_sensitivity(self,y0, S0, T, f_param=0):
+        Y_S = np.concatenate([y0, S0]) #Initial condition for the ODE system
+        sens_sol= self.ode_solver(fun = lambda t,Y_S: self.sensitivity_system(t,Y_S,f_param), t_span= (0.0,T),y0=Y_S,
+                            t_eval=[T],
+                            method="RK45",
+                            rtol = 1e-7, atol = 1e-9) #It's a function of t
+        
+        phi_T = sens_sol.y[:self.dim,-1]
+        S_T = sens_sol.y[self.dim:][:,-1] #We take S(T)
+
+        return phi_T, S_T
     def monodromy_mult(self,y, T, v, method = 1, epsilon = 1e-6):
         """
             M*v Matrix-vector multiplication using 
@@ -370,23 +406,7 @@ class orbit:
 
 
 
-    def integ_monodromy(self,y0,M0, T):
-        # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
-        # monodromy = np.eye(self.dim) #Initialisation of the monodromy matrix
-
-        # Y_M[:self.dim] = y0
-        # Y_M[self.dim:] = M0.flatten(order='F')
-        Y_M = np.concatenate([y0, M0.flatten(order='F')]) #Initial condition for the ODE system
-        big_sol= self.ode_solver(fun = self.big_system, t_span= (0.0,T),y0=Y_M,
-                            t_eval=[T],
-                            method="RK45",
-                            rtol = 1e-7, atol = 1e-9) #It's a function of t
-        
-        # phi_T = big_sol.y[:self.dim,-1]
-        monodromy = big_sol.y[self.dim:][:,-1] #We take M(T)
-
-        monodromy = monodromy.reshape(self.dim,self.dim, order = "F") #Back to the square matrix format
-        return big_sol.y[:self.dim,-1], monodromy  
+      
 
 
     def Newton_orbit(self,y0,T_0, Max_iter, epsilon,phase_cond = 2):
@@ -711,7 +731,7 @@ class orbit:
             #T_by_iter = y_by_iter[:, -1]
         return k, y_by_iter, T_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
 
-    def Newton_mass_conserv4(self,y0,T_0,alpha0, Max_iter, epsilon,h=1):
+    def Newton_mass_conserv4(self,model,y0,T_0,alpha0, Max_iter, epsilon,h=1):
         #h is the spatial step size
         #________________________________INITIALISATION_________________________________
         y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
@@ -723,53 +743,62 @@ class orbit:
         I = np.eye(self.dim)
         H = h*np.ones_like(y_star)
         m0 = H @ y0
-
+        T = 1.0
+        unscaled_f = model.dydt
+        
+        
         #______________________________Newton iteration loop________________
         for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
-            
+            self.f = (lambda t,y: T_star*(unscaled_f(t,y) - alpha*H ))
+            self.Jacf = (lambda t,y: T_star*model.jacobian(t,y)) #Jacobian wrt y only
             #Soving the whole system over one period
-            phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
-
-        #Selecting the phase-condition
-        #The orthogonality phase condition is imposed
-            d = 0
-            c = self.f(T_star,y_prev)
-            # c = self.f(T_star,y0)
-            # s = (y_star - y0) @ self.f(T_star,y0)
-            s = (y_star - y_prev)@self.f(T_star,y_prev)
-            bb = self.f(T_star, phi_T)*(1-H@alpha)
-
-            #Mass conservation condition
-            g = H @ (y_star - y_prev)
-            #c2 = H #derivative wrt y
-            d22  = H @ self.f(T_star,y_star)  #0 #derivative wrt T d22 = A32
-
-
-            #Concat the whole matrix
-            # top = np.hstack((monodromy - I, bb.reshape(-1,1), (-H.T).reshape(-1,1)))  # Horizontal stacking of A11=M-I, A12=b and A13 = -H^T 
-            dr_dy = (monodromy - I)*(1 - H@alpha )
-            dr_dalpha = np.ones_like(H)*(-g)
             
+            phi_T, monodromy = self.integ_monodromy(y_star,I,T)
 
-            top = np.hstack((dr_dy, bb.reshape(-1,1), dr_dalpha.reshape(-1,1)))  # Horizontal stacking of A11=M-I, A12=b and A13 = -H^T 
+            #The orthogonality phase condition s =  0 is imposed
+            s = (y_star - y_prev)@self.f(T_star,y_prev)
+            ds_dT = (y_star - y_prev)@(unscaled_f(T_star,y_prev) -alpha*H) #Derivative wrt T
+            #d = (y_star - y_prev)@self.f(T_star,y_prev)/T_star
+
+            ds_dy = self.f(T_star,y_prev) #Derivative wrt y
+            ds_dalpha = -T_star*(y_star - y_prev)@(H) #Derivative wrt alpha
+
+            # bb = self.f(T_star, phi_T)*(1-H@alpha)
+
+            #Periodicity condition
+            # r = phi_T - y_star
+            dr_dy = (monodromy - I) #Derivative wrt y
+            dr_dT = self.f(T_star, y_star) #Derivative wrt T
+            #Derivative wrt alpha. Solving a variational equation wrt alpha
+            # f_k = lambda t,K: T_star*self.Jacf(t,)- T_star*H*K
+            # sol_alpha = self.ode_solver(fun = f_k, t_span= (0.0,T),y0=H,
+            #                 t_eval=[T],
+            #                 method="RK45",
+            #                 rtol = 1e-7, atol = 1e-9)
+            # dr_dalpha = sol_alpha.y[:,-1]
+            _, dr_dalpha = self.integ_sensitivity(y_star, S0=np.zeros(self.dim), T=T, f_param = -T_star*H)
+            
+            top = np.hstack((dr_dy, dr_dT.reshape(-1,1), dr_dalpha.reshape(-1,1)))  # Horizontal stacking of A11=M-I, A12=b and A13 = -H^T 
 
             #
-            middle = np.hstack((c.reshape(1,-1), np.array([[d]]), np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+            middle = np.hstack((ds_dy.reshape(1,-1), np.array([[ds_dT]]), np.array([[ds_dalpha]])))  # Horizontal stacking of A21=c and A22=d
             
 
             #Mass conservation condition
-            #H.Jacf with H = [1,1,...,1] 
-            # H = h*np.ones((1,self.dim))
+            m = H @ (y_star - y_prev)
+            #c2 = H #derivative wrt y
+            dm_dT  = H @ self.f(T_star,y_star)  #0 #derivative wrt T d22 = A32
+            dm_dalpha = 0.0 #Derivative wrt alpha
             
             # A31 = (M -I) @ H 
-            A31 = (monodromy - I )@ H 
+            dm_dy =  H 
             # bottom = np.hstack((A31.reshape(1,-1), np.array([[d22]]), zero.reshape(1,-1))) #Horizontal stacking of A31=H.Jacf and A32=0
-            bottom = np.hstack((A31.reshape(1,-1), np.array([[d22]]), np.array([[d]]))) #Horizontal stacking of A31=H.Jacf and A32=0
+            bottom = np.hstack((dm_dy.reshape(1,-1), np.array([[dm_dT]]), np.array([[dm_dalpha]]))) #Horizontal stacking of A31=H.Jacf and A32=0
 
             Mat = np.vstack((top, middle,bottom))  # Vertical stacking of the three rows
 
             #Right hand side concatenation
-            B = np.concatenate((phi_T - y_star, np.array([s]), np.array([g])))   #np.array([s(T_star,y_star)])))
+            B = np.concatenate((phi_T - y_star, np.array([s]), np.array([m])))   #np.array([s(T_star,y_star)])))
             
             
             # XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelss') #Contain Delta_X and Delta_T
@@ -779,9 +808,9 @@ class orbit:
             Delta_T = XX[self.dim]
             # print('Delta_T=', Delta_T)
 
-            Delta_alpha = XX[(self.dim+1):]
+            Delta_alpha = XX[-1]
             print('Delta_alpha=', Delta_alpha)
-            print('alpha shape=', np.shape(alpha))
+            # print('alpha shape=', np.shape(alpha))
             #Updating
             y_prev = y_star
             y_star += Delta_y
@@ -794,7 +823,8 @@ class orbit:
             mass[k] = h*np.sum(y_star, axis=0)
             
             print(f"Iteration {k}, ")
-            print(f"min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+            print(f"min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")
+            print(f"alpha = {alpha:.5f}")              
             # y_by_iter[k,:] = y_star
             T_by_iter[k] = T_star
             print(f"err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}")#, norm alpha = {np.abs(alpha):.3e}")
@@ -1695,7 +1725,8 @@ class Mckean_Vlasov:
                         self.full_sub_iter = bool(int(res))
                     elif var == 'm0': #Initial mass
                         self.m0 = float(res)
-
+                    elif var == 'alpha': #Unfolding parameter
+                        self.alpha = float(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
 
@@ -1812,9 +1843,11 @@ class Mckean_Vlasov:
         #Augmented rho with the time scaling variable and the unfolding parameter alpha
         #T= rho[-2], alpha = rho[-1]
         #Gradient of the fisrt integral function: The mass.
-        grad_H = np.ones_like(rho[:-2])
+        T=self.T_ini
+        alpha=self.alpha
+        grad_H = np.ones_like(rho)
 
-        return np.append(rho[-2]*self.dydt(t, rho[:-2]) - rho[-1]*grad_H, [0,0])
+        return T*(self.dydt(t,rho) - alpha*grad_H)
     
     def dydt_dissip2(self, t, rho,m0=1):
         "rhs of the discretized dissipative Mckean-Vlasov equation"
@@ -1841,14 +1874,10 @@ class Mckean_Vlasov:
 
     def jacobian_dissip(self, t, rho):
         """Jacobian of the right hand side of the dissipative Mckean-Vlasov equation"""
-        J = self.jacobian(t, rho[:-2])
-        n = self.n_z - 1
-        #Append the last two rows and columns for the time scaling and unfolding parameter
-        J_dissip = np.zeros((n+2, n+2))
-        J_dissip[:n,:n] = J * rho[-2]
-        J_dissip[:n,-2] = self.dydt(t, rho[:-2])
-        J_dissip[:n,-1] = -np.ones(n)
-        return J_dissip
+        # 
+        T = self.T_ini
+        
+        return T*self.jacobian(t, rho)
     
     def jacobian(self, t, rho):
         """Jacobian of the right hand side of the Mckean-Vlasov equation"""

@@ -8,8 +8,9 @@ n_z=200
 m0=30.0
 #T_ini=2.97
 T_ini=3.0
+alpha=1e-8
 
-precision=1e-9
+precision=1e-4
 out_dir=./Results/mckean_vlasov/
 Max_iter=30
 method=BDF
