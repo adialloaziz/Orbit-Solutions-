@@ -7,9 +7,9 @@ scal=1
 n_z=200
 m0=30.0
 #T_ini=2.97
-T_ini=3.0
-alpha=1e-8
-
+T_ini=3.03
+alpha=1e-4
+beta=1e-3
 precision=1e-4
 out_dir=./Results/mckean_vlasov/
 Max_iter=30
@@ -21,7 +21,7 @@ full_sub_iter=1
 #0=False: subsp_iter will be muted to 1 except for the first NP iteration
 subsp_iter=5
 p0=5
-pe=5
+pe=4
 #if fixed time step solver
 solver_steps=100
 
