@@ -882,7 +882,7 @@ class orbit:
             Norm_B[k] = np.linalg.norm(B, ord=np.inf)
             y_by_iter[k,:] = y_star
             T_by_iter[k] = T_star
-            mass[k] = np.abs(Delta_m) #h*np.sum(y_star, axis=0)
+            mass[k] = H@y_star  #np.abs(Delta_m) #h*np.sum(y_star, axis=0)
             
             print('_________________________________________________________________________________\n')
             print(f"Iteration {k}, ")

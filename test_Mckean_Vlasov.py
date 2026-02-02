@@ -87,7 +87,7 @@ if __name__ == "__main__":
     # I_values = np.linspace(1.0, 1.2, 15)  # Example intensity values
     T = model.T_ini
     I_max = 1.5
-    cont_step = 0.01
+    cont_step = 0.05
 
     solutions = []
     today = datetime.date.today()
@@ -102,29 +102,34 @@ if __name__ == "__main__":
 
     with open(file, "w") as f:
         f.write("I_value\tTstar\tystar\n")
-        while model.I < I_max:
+        while ((model.I <= I_max) and (cont_step > 1e-4)):
             print(f"Computing solution for Intensity I = {model.I}")
             k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f_new, J_new, model.n_z,"Newton_mass_conserv4",
-                                                                                model.p0,y0=y0,T=T, filename=None)
-            
+                                                                                model.p0,y0=y0,T=T, filename=None)            
+
             if converged == -1:
                 print("Branch continuation stopped due to divergence.")
                 cont_step /= 2  # Reduce the continuation step
                 model.I -= cont_step  # Step back
                 continue  # Retry with a smaller step
             else:
+                if k <= 4:
+                    cont_step *= 1.5  # Increase the continuation step if convergence was fast
+               
+                T = T_by_iter[k]  # Update T for the next iteration
+                y0 = y_by_iter[k]  # Update y0 for the next iteration
+                solutions.append((model.I, y0, T, mass[k],k))
+
                 model.I += cont_step  # Increment the Intensity for the next step
-
-            y0 = y_by_iter[k]  # Update y0 for the next iteration
-            T = T_by_iter[k]  # Update T for the next iteration
             
-
-            solutions.append((model.I, y_by_iter[k], T_by_iter[k]))
 
             # Save intermediate results
             f.write(f"{model.I}\t{T_by_iter[k]}\t{y_by_iter[k].tolist()}\n")
             print("#-------------------------------------------------------------# \n")
-
+	    
+            # Save after each successful computation
+            with open(file_pkl, "wb") as f_pkl:
+                pickle.dump(solutions, f_pkl)
 
     # Save the branch of solutions to a file    
     with open(file_pkl, "wb") as f_pkl:
