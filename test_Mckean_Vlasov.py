@@ -87,7 +87,7 @@ if __name__ == "__main__":
     # I_values = np.linspace(1.0, 1.2, 15)  # Example intensity values
     T = model.T_ini
     I_max = 1.5
-    cont_step = 0.05
+    cont_step = 0.013
 
     solutions = []
     today = datetime.date.today()
@@ -123,13 +123,13 @@ if __name__ == "__main__":
                 model.I += cont_step  # Increment the Intensity for the next step
             
 
-            # Save intermediate results
-            f.write(f"{model.I}\t{T_by_iter[k]}\t{y_by_iter[k].tolist()}\n")
-            print("#-------------------------------------------------------------# \n")
+                # Save intermediate results
+                f.write(f"{model.I}\t{T_by_iter[k]}\t{y_by_iter[k].tolist()}\n")
+                print("#-------------------------------------------------------------# \n")
 	    
-            # Save after each successful computation
-            with open(file_pkl, "wb") as f_pkl:
-                pickle.dump(solutions, f_pkl)
+                # Save after each successful computation
+                with open(file_pkl, "wb") as f_pkl:
+                    pickle.dump(solutions, f_pkl)
 
     # Save the branch of solutions to a file    
     with open(file_pkl, "wb") as f_pkl:
