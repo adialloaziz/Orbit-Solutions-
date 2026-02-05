@@ -52,7 +52,7 @@ def run(model,f, J,n_z,orbit_method,p0,T, y0, filename=None):
 if __name__ == "__main__":
     BASE_PATH = Path().parent.resolve()
 
-    param_file = BASE_PATH/"mckean_vlasov_param_1.in"
+    param_file = BASE_PATH/"config_models/mckean_vlasov_param_1.in"
     param_file_name = "mckean_vlasov_param_1.in"
     # param_file = "./mckean_vlasov_param_1.in"  # file containing model parameters
     model = Mckean_Vlasov(param_file)
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # A loop to compute the branch of solutions wrt the Intensity I
     # I_values = np.linspace(1.0, 1.2, 15)  # Example intensity values
     T = model.T_ini
-    I_max = 1.5
+    I_max = 1.039
     cont_step = 0.013
 
     solutions = []
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         f.write("I_value\tTstar\tystar\n")
         while ((model.I <= I_max) and (cont_step > 1e-4)):
             print(f"Computing solution for Intensity I = {model.I}")
-            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f_new, J_new, model.n_z,"Newton_mass_conserv4",
+            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f_new, J_new, model.n_z,"Newton_orbit",
                                                                                 model.p0,y0=y0,T=T, filename=None)            
 
             if converged == -1:

@@ -473,8 +473,18 @@ class orbit:
                 print(f"Precision reached within {k+1} iterations")
                 converged = 1
                 break
-            else: 
+            # Preventing explosion of the variables
+            elif Abs_Err[k] >= 1e2:
+                print("Abs_Err too large, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif T_star <= 0:
+                print("Negative period, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif k >= Max_iter:
                 converged = 0
+                print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
     
@@ -543,8 +553,18 @@ class orbit:
                 print(f"Precision reached within {k+1} iterations")
                 converged = 1
                 break
-            else: 
+            # Preventing explosion of the variables
+            elif Abs_Err[k] >= 1e2:
+                print("Abs_Err too large, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif T_star <= 0:
+                print("Negative period, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif k >= Max_iter:
                 converged = 0
+                print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
     
@@ -899,9 +919,13 @@ class orbit:
                 print("Abs_Err too large, stopping iteration: Divergence.")
                 converged = -1
                 break
-            else:
-                print("Precision not yet reached.")
+            elif T_star <= 0:
+                print("Negative period, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif k >= Max_iter:
                 converged = 0
+                print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
 
@@ -1232,15 +1256,24 @@ class orbit:
             print(f"Mass = {mass[k]}")       
             print(f"err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}") 
             print(f"$err_rel(y)$ = {Rel_Err[k]:.3e} \n")
-
             print(f"$||Delta q||$ = {np.linalg.norm(Delta_q,ord=np.inf):.3e}")
             print(f"$||Delata p|| $= {np.linalg.norm(Delta_p,ord=np.inf):.3e}")
             if Rel_Err[k] <= epsilon:
                 print(f"Precision reached within {k+1} iterations")
                 converged = 1
                 break
-            else: 
+            # Preventing explosion of the variables
+            elif Abs_Err[k] >= 1e2:
+                print("Abs_Err too large, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif T_star <= 0:
+                print("Negative period, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif k >= Max_iter:
                 converged = 0
+                print("Maximum number of iterations reached.")
         # Final monodromy matrix computation
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged,mass
