@@ -57,7 +57,7 @@ class orbit:
         # Solving numerically the initial value problem (dy/dt,dM/dt = (f(t,y),Jacf*M) 
         M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
         dM_dt = self.Jacf(t,Y_M[:self.dim]) @ M  # Compute the matrix derivative
-        return np.concatenate([self.f(t, Y_M[:self.dim]),dM_dt.flatten(order = 'F')])
+        return np.concatenate((self.f(t, Y_M[:self.dim]),dM_dt.flatten(order = 'F')))
     def integ_monodromy(self,y0,M0, T):
         # Y_M = np.zeros((self.dim+self.dim**2)) #We solve simustanuously d+d*d ODEs
         # monodromy = np.eye(self.dim) #Initialisation of the monodromy matrix
@@ -479,7 +479,7 @@ class orbit:
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
     
 
-    def Newton_orbit_scaled(self,f_unscaled,jac_unscaled,y0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
+    def Newton_orbit_scaled(self,model,f_unscaled,jac_unscaled,y0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
 
         #________________________________INITIALISATION_________________________________
         y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
@@ -489,14 +489,15 @@ class orbit:
         mass = np.zeros((Max_iter))
         Rel_Err = np.zeros((Max_iter))
         I = np.eye(self.dim)
+        T_unit = 1.0 #Scaled time variable
 
         #______________________________Newton iteration loop________________
         for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
             
-            self.f = lambda t,y: T_star * f_unscaled(t,y)
-            self.Jacf = lambda t,y: T_star * jac_unscaled(t,y)
+            self.f = lambda t,y: T_star * model.dydt_new(t,y)
+            self.Jacf = lambda t,y: T_star * model.jacobian_new(t,y)
 
-            T_unit = 1.0 #Scaled time variable
+            
             #Soving the whole system over one period
             phi_T, monodromy = self.integ_monodromy(y_star,I,T_unit)
             
@@ -703,8 +704,6 @@ class orbit:
             #T_by_iter = y_by_iter[:, -1]
         return k, y_by_iter[:,-1], y_by_iter[:,:-1], Norm_B, Abs_Err, Rel_Err, converged, mass
 
-
-
     def Newton_mass_conserv3(self,y0,T_0, Max_iter, epsilon,h=1):
         #________________________________INITIALISATION_________________________________
         Y_star, Y_prev = y0.copy(), y0.copy()
@@ -829,13 +828,12 @@ class orbit:
             phi_T, monodromy = self.integ_monodromy(y_star,I,T)
 
             #The orthogonality phase condition s =  0 is imposed
-            s = (y_star - y_prev)@self.f(T,y_prev)
-            ds_dT = (y_star - y_prev)@(unscaled_f(T,y_prev) -alpha*H) #Derivative wrt T
+            s = (y_star - y0)@self.f(T,y0)
+            ds_dT = (y_star - y0)@(unscaled_f(T,y0) -alpha*H) #Derivative wrt T
             #d = (y_star - y_prev)@self.f(T_star,y_prev)/T_star
 
-            ds_dy = self.f(T,y_prev) #Derivative wrt y
-            ds_dalpha = -T_star*(y_star - y_prev)@(H) #Derivative wrt alpha
-
+            ds_dy = self.f(T,y0) #Derivative wrt y
+            ds_dalpha = -T_star*(y_star - y0)@(H) #Derivative wrt alpha
             #Periodicity condition r = phi_T - y_star
             dr_dy = (monodromy - I) #Derivative wrt y
             dr_dT = self.f(T, y_star) #Derivative wrt T
@@ -1166,6 +1164,7 @@ class orbit:
         Norm_B = np.zeros(Max_iter)
         Abs_Err = np.zeros(Max_iter)
         Rel_Err = np.zeros(Max_iter)
+        mass = np.zeros(Max_iter)
         Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
         
         p = p0
@@ -1227,8 +1226,13 @@ class orbit:
             Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
             T_by_iter[k] = T_star
             Norm_B[k] = np.linalg.norm(B,ord=np.inf)
-            print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}, p = {p}")
-            print(f"$||err_rel(y)||$ = {Rel_Err[k]:.3e}")
+            mass[k] = np.ones_like(y_star)@y_star 
+
+            print(f"_____________________Iteration {k}____________________________")  
+            print(f"Mass = {mass[k]}")       
+            print(f"err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}") 
+            print(f"$err_rel(y)$ = {Rel_Err[k]:.3e} \n")
+
             print(f"$||Delta q||$ = {np.linalg.norm(Delta_q,ord=np.inf):.3e}")
             print(f"$||Delata p|| $= {np.linalg.norm(Delta_p,ord=np.inf):.3e}")
             if Rel_Err[k] <= epsilon:
@@ -1239,7 +1243,7 @@ class orbit:
                 converged = 0
         # Final monodromy matrix computation
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
-        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged,mass
 
     def NP_mass_conserv(self,y0,T_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
         #h is the spatial step size
@@ -2046,16 +2050,137 @@ class Mckean_Vlasov:
 
         dydt = (np.roll(F_L, shift=-1) - F_L) # Sifting matrix to apply the finite volume scheme
         H = h*np.ones_like(rho)
-        m = H @ rho
-        return dydt + self.beta*(m-self.m0)*H
+        # m = H @ rho
+        return dydt + self.beta*(H @ rho - self.m0)*H
         # return dydt + self.beta*(rho*(h*h) - self.m0*H)
     
     def jacobian_new(self, t, rho):
         """Jacobian of the right hand side of the Mckean-Vlasov equation"""
         _,_, h = self.mesh1D
         J = self.jacobian(t, rho)
-        n = self.n_z - 1
         H = h*np.ones_like(rho)
-        return J + np.diag(self.beta*(H@H)*np.ones(n),k=0)
 
+        return J + self.beta * H@H.T  #np.diag(self.beta*(H@H)*np.ones(n),k=0)
 
+class heat_equation:
+    def __init__(self, ficname):
+        self.ficname = ficname
+        self.read_params()
+        self.mesh1D = self.mesh_1D()  # Initialize the mesh
+        self.Lap = self.Lap_mat() #To avoid several call in the next functions
+    
+    def update_params(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Unknown parameter: {key}")
+        # Recompute dependent attributes if necessary
+        if any(key in kwargs for key in ['n_z', 'z_L', 'D']):
+            self.mesh1D = self.mesh_1D()  # Update the mesh if n_z or z_L changes
+            self.Lap = self.Lap_mat()  # Update the Laplacian matrix if n_z changes
+    def read_params(self): 
+        with open(self.ficname, 'r') as fic:
+            for line in fic:
+                line = line.strip()  # Remove leading/trailing spaces and newline
+                if not line or line.startswith("#"):  # Ignore empty lines and comments
+                    continue
+                parts = line.split('=')
+                if len(parts) != 2:
+                    print("#########################################")
+                    print("Error in parameter file (Invalid format)")
+                    print(line)
+                    sys.exit(1)
+
+                var, res = parts[0].strip().lower(), parts[1].strip()
+                try:
+                    if var == "n_z":
+                        self.n_z = int(res)
+
+                    elif var == "d": #Diffusion coefficient
+                        self.D = float(res)
+                    elif var == "t_ini":
+                        self.T_ini = float(res)
+                    elif var == "precision":
+                        self.precision = float(res)
+                    elif var == "z_l": #Length of the domain
+                        self.z_L = float(res)
+                    elif var == 'num_test':
+                        self.num_test = int(res)
+                    elif var == 'out_dir':
+                        self.out_dir = str(res)
+                    elif var == 'solver_steps':
+                        self.solver_steps = int(res)
+                    elif var == 'method':
+                        self.method = str(res)
+                    elif var == 'max_iter':
+                        self.max_iter = int(res)
+                    elif var == 'subsp_iter':
+                        self.subsp_iter = int(res)
+                    elif var == 'p0':
+                        self.p0 = int(res)
+                    elif var == 'pe':
+                        self.pe = int(res)
+                    elif var == 'rho':
+                        self.rho = float(res)
+                    elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
+                        self.picard_iter = int(res)
+                    elif var == 'full_sub_iter':
+                        self.full_sub_iter = bool(int(res))
+                    elif var == 'alpha': #Unfolding parameter
+                        self.alpha = float(res)
+                    elif var == 'm0': #Initial mass
+                        self.m0 = float(res)
+                    else:
+                        raise ValueError(f"Unknown parameter: {var}")
+                    
+                
+                except ValueError as e:
+                    print("#########################################")
+                    print("Error in parameter file")
+                    print(line)
+                    print(f"Exception: {e}")
+                    sys.exit(1)
+    
+    def mesh_1D(self):
+        "Create a uniform mesh in the interval [0, z_L] with n_z points"
+        h = self.z_L / (self.n_z - 1)
+        z = np.linspace(0, self.z_L, self.n_z)
+        return (z, h)
+    def Lap_mat(self):
+        "Laplacian Matrix"
+        _,h = self.mesh1D
+        main_diag = -2 * np.ones(self.n_z)
+        #Effect of the Neumann boundary conditions
+        main_diag[0] = -1
+        main_diag[-1] = -1
+        off_diag = np.ones(self.n_z - 1)
+        A = np.diag(main_diag) + np.diag(off_diag, k=1) + np.diag(off_diag, k=-1)
+        return A/(h*h)
+    def source_term(self,t,y):
+        # Periodic source term with mean zero
+        z,h=self.mesh1D
+        return np.cos(np.pi * t)*(np.cos(4*np.pi*z)) #np.cos(np.pi*y) #* np.ones_like(y)
+    def dydt(self, t, y):
+        # The heat equation dy/dt = Ay with A the Laplacian operator
+
+        return self.D * (self.Lap_mat() @ y) + self.source_term(t,y)
+    
+    def jacobian(self, t, y):
+        # Jacobian of the heat equation
+        return self.D * self.Lap_mat()
+    
+    def dydt_new(self,t,y):
+        #The modified heat equation with an artificial parameter beta
+        z,h=self.mesh1D
+        H = h*np.ones_like(y)
+        return self.dydt(t,y) + self.alpha*(H @ y - self.m0)*H
+    
+    def jacobian_new(self, t, y):
+        # Jacobian of the modified heat equation
+        _,h = self.mesh1D
+        J = self.jacobian(t, y)
+        H = h*np.ones_like(y)
+
+        return J + self.alpha * H@H.T  #np.diag(self.beta*(H@H)*np.ones(n),k=0)
+    

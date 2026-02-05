@@ -1,19 +1,14 @@
-num_test=2
-D=1.0
-I=1.0
-xmin=-15.0
-xmax=15.0
-scal=1 
-n_z=200
-m0=30.0
-#T_ini=2.97
-T_ini=3.03
-alpha=1e-4
-beta=1e-3
-precision=1e-4
-out_dir=./Results/mckean_vlasov/
-Max_iter=30
-method=BDF
+num_test=0
+z_L=1.0 
+n_z=100
+T_ini=1.8
+precision=1e-9
+D=5e-4
+m0=3.0
+out_dir=./Results/heat_equation/
+method=RK45
+Max_iter=60
+alpha=-1
 #PARMETERS FOR NEWTON-PICARD Method
 rho=0.5
 picard_iter=2
@@ -24,4 +19,3 @@ p0=5
 pe=4
 #if fixed time step solver
 solver_steps=100
-
