@@ -482,7 +482,7 @@ class orbit:
                 print("Negative period, stopping iteration: Divergence.")
                 converged = -1
                 break
-            elif k >= Max_iter:
+            elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
 
@@ -562,7 +562,7 @@ class orbit:
                 print("Negative period, stopping iteration: Divergence.")
                 converged = -1
                 break
-            elif k >= Max_iter:
+            elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
 
@@ -848,12 +848,12 @@ class orbit:
             phi_T, monodromy = self.integ_monodromy(y_star,I,T)
 
             #The orthogonality phase condition s =  0 is imposed
-            s = (y_star - y0)@self.f(T,y0)
-            ds_dT = (y_star - y0)@(unscaled_f(T,y0) -alpha*H) #Derivative wrt T
+            s = (y_star - y_prev)@self.f(T,y_star)
+            ds_dT = (y_star - y_prev)@(unscaled_f(T,y_prev) -alpha*H) #Derivative wrt T
             #d = (y_star - y_prev)@self.f(T_star,y_prev)/T_star
 
-            ds_dy = self.f(T,y0) #Derivative wrt y
-            ds_dalpha = -T_star*(y_star - y0)@(H) #Derivative wrt alpha
+            ds_dy = self.f(T,y_prev) #Derivative wrt y
+            ds_dalpha = -T_star*(y_star - y_prev)@(H) #Derivative wrt alpha
             #Periodicity condition r = phi_T - y_star
             dr_dy = (monodromy - I) #Derivative wrt y
             dr_dT = self.f(T, y_star) #Derivative wrt T
@@ -861,7 +861,6 @@ class orbit:
             _, dr_dalpha = self.integ_sensitivity(y_star, S0=np.zeros(self.dim), T=T, f_param = -T_star*H)
             
             #Mass conservation condition
-            # m = H @ (y_star - y_prev)
             Delta_m = H @ (y_star) - m0
             #c2 = H #derivative wrt y
             dm_dT  = 0.0 #H @ self.f(T,y_star)  #0 #derivative wrt T d22 = A32
@@ -883,17 +882,19 @@ class orbit:
             
             # XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelss') #Contain Delta_X and Delta_T
 
-            XX = solve(Mat, -B, overwrite_a=True, overwrite_b=True) #Contain Delta_X, Delta_T and Delta_alpha
+            XX = solve(Mat, -B) #Contain Delta_X, Delta_T and Delta_alpha
             Delta_y = XX[:self.dim]
             Delta_T = XX[self.dim]
 
             Delta_alpha = XX[-1]
+            print(f"Delta_alpha = {Delta_alpha:.4e}")
 
             #Updating
             y_prev = y_star
             y_star += Delta_y
             T_star += Delta_T
             alpha += Delta_alpha
+            
             #Estimation of the errors
             Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
             Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
@@ -923,7 +924,7 @@ class orbit:
                 print("Negative period, stopping iteration: Divergence.")
                 converged = -1
                 break
-            elif k >= Max_iter:
+            elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
 
@@ -1271,7 +1272,7 @@ class orbit:
                 print("Negative period, stopping iteration: Divergence.")
                 converged = -1
                 break
-            elif k >= Max_iter:
+            elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
         # Final monodromy matrix computation
