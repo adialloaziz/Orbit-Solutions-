@@ -437,8 +437,8 @@ class orbit:
         #     else:
         #         if (phase_cond == 2) : #Orthogonality phase-condition
             d = 0
-            c = self.f(T_star,y_prev)
-            s = (y_star - y_prev)@self.f(T_star,y_prev)
+            c = self.f(T_star,y0)
+            s = (y_star - y0)@self.f(T_star,y0)
             
             bb = self.f(T_star, phi_T)
             #Concat the whole matrix
@@ -489,7 +489,7 @@ class orbit:
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
     
 
-    def Newton_orbit_scaled(self,model,f_unscaled,jac_unscaled,y0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
+    def Newton_orbit_scaled(self,model,y0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
 
         #________________________________INITIALISATION_________________________________
         y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
@@ -513,12 +513,12 @@ class orbit:
             
             #Phase condition
             
-            s = (y_star - y_prev)@self.f(T_unit,y_prev)
-            ds_dT = (y_star - y_prev)@(f_unscaled(T_unit,y_prev))
-            ds_dy = self.f(T_unit,y_prev)
+            s = (y_star - y0)@ model.dydt_new(T_unit,y0) #self.f(T_unit,y0)
+            ds_dT = 0#(y_star - y0)@(model.dydt_new(T_unit,y_prev))
+            ds_dy = self.f(T_unit,y0)
 
             #Periodicity condition
-            dr_dT = self.f(T_unit,y_star)
+            dr_dT = model.dydt_new(T_unit,y_star)
             #dr_dy = monodromy - I
 
             #Concat the whole matrix
@@ -848,15 +848,15 @@ class orbit:
             phi_T, monodromy = self.integ_monodromy(y_star,I,T)
 
             #The orthogonality phase condition s =  0 is imposed
-            s = (y_star - y_prev)@self.f(T,y_star)
-            ds_dT = (y_star - y_prev)@(unscaled_f(T,y_prev) -alpha*H) #Derivative wrt T
+            s = (y_star - y0)@self.f(T,y0) #unscaled_f(T,y0)
+            ds_dT = (y_star - y0)@(unscaled_f(T,y_star) -alpha*H) #Derivative wrt T
             #d = (y_star - y_prev)@self.f(T_star,y_prev)/T_star
 
-            ds_dy = self.f(T,y_prev) #Derivative wrt y
-            ds_dalpha = -T_star*(y_star - y_prev)@(H) #Derivative wrt alpha
+            ds_dy = self.f(T,y0)#unscaled_f(T,y0) #Derivative wrt y
+            ds_dalpha = -T_star*(y_star - y0)@(H) #Derivative wrt alpha
             #Periodicity condition r = phi_T - y_star
             dr_dy = (monodromy - I) #Derivative wrt y
-            dr_dT = self.f(T, y_star) #Derivative wrt T
+            dr_dT = unscaled_f(T,y_star) - alpha*H #self.f(T, y_star) #Derivative wrt T
             #Derivative wrt alpha. Solving a variational equation wrt alpha
             _, dr_dalpha = self.integ_sensitivity(y_star, S0=np.zeros(self.dim), T=T, f_param = -T_star*H)
             
@@ -885,10 +885,7 @@ class orbit:
             XX = solve(Mat, -B) #Contain Delta_X, Delta_T and Delta_alpha
             Delta_y = XX[:self.dim]
             Delta_T = XX[self.dim]
-
             Delta_alpha = XX[-1]
-            print(f"Delta_alpha = {Delta_alpha:.4e}")
-
             #Updating
             y_prev = y_star
             y_star += Delta_y
@@ -2194,7 +2191,7 @@ class heat_equation:
     def source_term(self,t,y):
         # Periodic source term with mean zero
         z,h=self.mesh1D
-        return np.cos(np.pi * t)*(np.cos(4*np.pi*z)) #np.cos(np.pi*y) #* np.ones_like(y)
+        return np.cos(np.pi * t)*(np.cos(2*np.pi*z)) #np.cos(np.pi*y) #* np.ones_like(y)
     def dydt(self, t, y):
         # The heat equation dy/dt = Ay with A the Laplacian operator
 

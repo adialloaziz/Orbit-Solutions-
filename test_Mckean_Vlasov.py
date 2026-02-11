@@ -28,8 +28,8 @@ def run(model,f, J,n_z,orbit_method,p0,T, y0, filename=None):
     "y0": y0,
     "T_0": T,
     "model": model,
-    "f_unscaled": f_new,
-    "jac_unscaled": J_new,
+    "f_unscaled": f,
+    "jac_unscaled": J,
     "alpha_0": model.alpha,
     "Max_iter": model.max_iter,
     "epsilon": epsilon,
@@ -59,12 +59,12 @@ if __name__ == "__main__":
     print("Loaded parameters:", model.n_z)
     
     
-    f_new = model.dydt_new
-    J_new = model.jacobian_new
+    # f_new = model.dydt_new
+    # J_new = model.jacobian_new
     
 
-    # f = model.dydt
-    # J = model.jacobian
+    f = model.dydt
+    J = model.jacobian
 
     z, z_centers, h = model.mesh1D  # Get the mesh and centers
     
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     model.m0 = float(H @ y0)
 
     #We integrate sufficiently the equation to find a good starting point
-    phi_t = solve_ivp(fun= f_new, t_span = (0, 5*model.T_ini), y0 = y0, method='BDF', jac = J_new,
+    phi_t = solve_ivp(fun= f, t_span = (0, 6*model.T_ini), y0 = y0, method='BDF', jac = J,
                      rtol=1e-7, atol=1e-9,
-                     t_eval= [5*model.T_ini])
+                     t_eval= [6*model.T_ini])
     
     y0 = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         f.write("I_value\tTstar\tystar\n")
         while ((model.I <= I_max) and (cont_step > 1e-4)):
             print(f"Computing solution for Intensity I = {model.I}")
-            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f_new, J_new, model.n_z,"Newton_orbit",
+            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,"Newton_mass_conserv4",
                                                                                 model.p0,y0=y0,T=T, filename=None)            
 
             if converged == -1:
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 model.I -= cont_step  # Step back
                 continue  # Retry with a smaller step
             else:
-                if k <= 4:
+                if k <= 3:
                     cont_step *= 1.5  # Increase the continuation step if convergence was fast
                
                 T = T_by_iter[k]  # Update T for the next iteration
