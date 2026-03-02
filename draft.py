@@ -214,7 +214,6 @@ def to_banded(A_sparse, l, u):
     return ab
 
 
-
 def NP_project_anim(self, f, y0, T_0, Ve_0, p0, pe, rho, Jacf, Max_iter, subsp_iter, epsilon):
     """----------Initialization--------"""
     y_star = y0
@@ -346,95 +345,622 @@ def V(self, z, rho):
         return z*z/2 + sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
         # return z*z/2 #+ np.trapezoid(self.Haissinski_kernel(z) * rho)
     
-    def mesh1D(self):
-        "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
-        h = (self.xmax - self.xmin) / (self.n_z - 1)
-        x = np.linspace(self.xmin, self.xmax, self.n_z)
-        # Centers of the mesh cells
-        x_centers = x[:-1] + h/2
-        return (x, x_centers, h)
-    
-    def flux(self, rho):
-        "Compute the flux of the density rho"
-        #y = rho[:,0] if rho.ndim > 1 else rho
-        x, x_centers, h = self.mesh1D
-        V = self.V(x_centers, rho)  # Potential at the center of the cells
-        F_L = np.zeros_like(x_centers)  # Containining all the flux values
-        V_diff = V[1:] - V[:-1]
-        #No flux on the boundaries
-        F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
-        return F_L
-    
-    def dydt(self, t, rho):
-        "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
-        #We suppose a uniform mesh in the interval [xmin, xmax]
-        x, x_centers,h = self.mesh1D  # Get the mesh and centers
-        # V = self.V(x_centers, rho)  # Potential at the center of the cells
-        # # F_K = np.zeros(self.n_z)  # Force term K
-        # F_K = np.zeros_like(x_centers)  # Force term K
-        F_L = np.zeros_like(x_centers)  
-        # # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
-        # V_diff = V[1:] - V[:-1]
-        # F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1] 
-        # F_K[:-1] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
-        F_L = self.flux(rho)  # Flux of the density y
+def mesh1D(self):
+    "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
+    h = (self.xmax - self.xmin) / (self.n_z - 1)
+    x = np.linspace(self.xmin, self.xmax, self.n_z)
+    # Centers of the mesh cells
+    x_centers = x[:-1] + h/2
+    return (x, x_centers, h)
+def flux(self, rho):
+    "Compute the flux of the density rho"
+    #y = rho[:,0] if rho.ndim > 1 else rho
+    x, x_centers, h = self.mesh1D
+    V = self.V(x_centers, rho)  # Potential at the center of the cells
+    F_L = np.zeros_like(x_centers)  # Containining all the flux values
+    V_diff = V[1:] - V[:-1]
+    #No flux on the boundaries
+    F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
+    return F_L
+def dydt(self, t, rho):
+    "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
+    #We suppose a uniform mesh in the interval [xmin, xmax]
+    x, x_centers,h = self.mesh1D  # Get the mesh and centers
+    # V = self.V(x_centers, rho)  # Potential at the center of the cells
+    # # F_K = np.zeros(self.n_z)  # Force term K
+    # F_K = np.zeros_like(x_centers)  # Force term K
+    F_L = np.zeros_like(x_centers)  
+    # # F_K[1:-1] = self.Bernoulli((V[:-1] - V[1:]))*y[1:] - self.Bernoulli((V[1:] - V[:-1]))*y[:-1]
+    # V_diff = V[1:] - V[:-1]
+    # F_L[1:] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1] 
+    # F_K[:-1] = self.Bernoulli(-V_diff*h)*rho[1:] - self.Bernoulli(V_diff*h)*rho[:-1]
+    F_L = self.flux(rho)  # Flux of the density y
 
-        # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
-        F_K = np.roll(F_L, shift=-1)
-        dydt = (F_K - F_L) / (h*h) 
-        return dydt
-    
-    # def jacobian(self, t, rho):
-    #     "Jacobian of the right hand side of the Mckean-Vlasov equation"
-    #     _, x_centers, h = self.mesh1D  # Get the mesh and centers
-    #     V = self.V(x_centers, rho)#y[1:-1])  # Potential at the center of the cells
-    #     V_diff = V[1:] - V[:-1]
-    #     B_left = self.Bernoulli(-V_diff*h)
-    #     B_right = self.Bernoulli(V_diff*h)
-    #     J_linear = sp.sparse.diags([0], shape=(self.n_z-1, self.n_z-1), format='csr')  # Initialize the Jacobian matrix
-    #     # B1 = np.concatenate([[0],B_left[:-1],[0]]) + np.concatenate([[0],B_right[1:],[0]])
-    #     # M = sp.sparse.diags([0], shape=(self.n_z-3, self.n_z-1), format='csr')
-    #     # M.setdiag(-(B_right[1:] + B_left[:-1]),k=0)
-    #     # M.setdiag(-(B_right[1:] + B_left[:-1]),k=0)
+    # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
+    F_K = np.roll(F_L, shift=-1)
+    dydt = (F_K - F_L) / (h*h) 
+    return dydt
+def Newton_mass_conserv2(self,y0,T_0, Max_iter, epsilon,h=1):
+    #________________________________INITIALISATION_________________________________
+    y_star, y_prev = y0.copy(), y0.copy()
 
-    #     #Only the two first components of the first row are non zero
-    #     # J_linear[0, 0] = -self.Bernoulli((V[1]-V[0])*h)
-    #     # J_linear[0, 1] = self.Bernoulli((V[0]-V[1])*h)
-    #     #Only the two last components of the last row are non zero
-    #     # diag_J = np.concatenate([[0],B_left]) + np.concatenate([B_right,[0]])
-    #     diag_J = np.concatenate([[0],B_left[:-1],[0]]) + np.concatenate([[0],B_right[1:],[0]])
-
-    #     diag_J[0] = B_right[0]
-    #     diag_J[-1] = -B_left[-1]
-    #     lower_diag_J = B_right.copy()
-    #     lower_diag_J[-1] *=-1
-    #     # J_linear[-1, -2] = -self.Bernoulli((V[-1]-V[-2])*h)
-    #     # J_linear[-1, -1] = self.Bernoulli((V[-2]-V[-1])*h)
-
-    #     J_linear.setdiag(-diag_J,k=0)
-    #     J_linear.setdiag(lower_diag_J,k=-1)
-    #     J_linear.setdiag(B_left,k=1)
-
-         
-    #     B_prime_left = self.derivative_Bernoulli(-V_diff*h)
-    #     B_prime_right = self.derivative_Bernoulli(V_diff*h)
-    #     # B1 = np.concatenate([[-B_prime_right[0]],B_prime_left[:-1],[0]]) - np.concatenate([[0],B_prime_right[1:],[-B_prime_left[-1]]])
-    
-    #     # M = sp.sparse.diags(B1*rho, shape=(self.n_z-1, self.n_z-1), format='csr')
-    #     # M1 = sp.sparse.diags([B_prime_left,B_prime_right],[-1,1], shape=(self.n_z-1, self.n_z-1), format='csr')        
+    y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)), np.zeros((Max_iter))
+    Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+    mass = np.zeros((Max_iter))
+    Rel_Err = np.zeros((Max_iter))
+    I = np.eye(self.dim)
+    H = h*np.ones(self.dim)
+    # H[-1] = 0 #No contribution from alvariable
+    m0 = H @ y0
+    T = T_0
+    # T_star = y_star[-1]
+    #______________________________Newton iteration loop________________
+    for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
         
-    #     J_non_lin = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
-    #     J_non_lin[0,:] = -h*(B_prime_left[0]*rho[1] + B_prime_right[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
-    #     J_non_lin[-1,:] = -h*(B_prime_left[-1]*rho[-1] + B_prime_right[-1]*rho[-2])*(self.C_mat[1,:] - self.C_mat[0,:])
-    #     # print('Jnonlin 0 shape', J_non_lin[0,:].shape)
+        #Soving the whole system over one period
+        phi_T, monodromy = self.integ_monodromy(y_star,I,T)
 
-    #     for i in range(1,self.n_z-3):
-    #         s = -h*(B_prime_left[i+1]*rho[i+1] + B_prime_right[i+1]*rho[i])*(self.C_mat[i+1,:] - self.C_mat[i,:])
+    #Selecting the phase-condition
+    #The orthogonality phase condition is imposed
+        d = 0
+        # c = self.f(T_star,y_prev)
+        c = self.f(T,y0)
+        s = (y_star - y0) @ self.f(1,y0)
+        # s = (y_star - y_prev)@self.f(T_star,y_prev)
+        bb = self.f(T, phi_T)
 
-    #         J_non_lin[i,:] = s+h*(B_prime_left[i]*rho[i] + B_prime_right[i]*rho[i-1])*(self.C_mat[i,:] - self.C_mat[i-1,:])
+        #Mass conservation condition
+        m = H @ y_star - m0
+        #c2 = H #derivative wrt y
+        d22 = H @ (self.f(T,y_star) - self.f(T,self.y0)) #0 #derivative wrt T
 
-    #     # Jac_F_L[1:,:] = diag_B.toarray()#- (h*diag_B_prime ) @ (self.C_mat - self.C_mat_sifted )
-    #     # print('Jac_F_L',Jac_F_L)
-    #     # Jac_F_K = np.roll(Jac_F_L, shift=-1, axis=0)  # Shift the Jacobian matrix to the right
-    #     # print('Jac_F_K',Jac_F_K)
-    #     return (J_linear + J_non_lin)/(h*h)
+        #Concat the whole matrix
+        top = np.hstack((monodromy - I, bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+        #
+        middle = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+        
+        
+        # A31 = H @ I
+        bottom = np.hstack(((H.T).reshape(1,-1) ,np.array([[d22]]))) #Horizontal stacking of A31=H.Jacf and A32=0
+        Mat = np.vstack((top, middle,bottom))  # Vertical stacking of the three rows
+
+        #Right hand side concatenation
+        B = np.concatenate((phi_T - y_star, np.array([s]), np.array([m])))   #np.array([s(T_star,y_star)])))
+        
+        
+        XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelss') #Contain Delta_X and Delta_T
+        Delta_y = XX[:self.dim]
+        Delta_T = XX[-1]
+        
+        #Updating
+        y_prev = y_star
+        y_star += Delta_y
+        T += Delta_T
+        # T_star = y_star[-1]
+        Abs_Err[k] = np.linalg.norm(Delta_y[:-1], ord=np.inf)
+        Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star[:-1], ord=np.inf)
+        Norm_B[k] = np.linalg.norm(B, ord=np.inf)
+        y_by_iter[k,:] = y_star
+        mass[k] = H @ y_star  #h*np.sum(y_star[:-1], axis=0)
+
+        print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+        # y_by_iter[k,:] = y_star
+        print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T:.5f}")
+        print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}")
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1
+            break
+        else: 
+            converged = 0
+
+        #T_by_iter = y_by_iter[:, -1]
+    return k, y_by_iter[:,-1], y_by_iter[:,:-1], Norm_B, Abs_Err, Rel_Err, converged, mass
+def Newton_corr_unfold(self, y,phi_T, T, Vp, Wp, Delta_q, y_prev,H):
+    """
+    Perform Newton correction for the orbit finding method with mass conservation.
+    Args:
+        y: Current state vector.
+        phi_T: Solution at time T.
+        T: Time period.
+        Vp: Basis vectors for the subspace.
+        Wp: Monodromy matrix applied to Vp (from the last iteration of the subspace iteration).
+        Delta_q: Picard correction vector.
+        y_prev: Previous state vector for phase condition.
+        h: Spatial step size for mass conservation.
+
+    Returns:
+        Delta_p: Corrected state vector in the dominant subspace after Newton iteration.
+        Delta_T: Corrected time period.
+        B: Right-hand side of the linear system.
+    """
+    Sp = Vp.T @ Wp 
+    # Phase condition
+    d11 = 0
+    c1 = self.f(T, y_prev)
+    s = (y + Delta_q - y_prev) @ c1
+    b1 = Vp.T @ self.f(T, phi_T)
+    # Mass conservation condition
+    m = H @ (y - self.y0)
+    c2 = H #derivative wrt y
+    d22 = H@ (self.f(T,y) - self.f(T,self.y0)) #0 #derivative wrt T
+
+    # Build augmented linear system [A | b]
+    top = np.hstack((Sp - np.eye(Vp.shape[1]), b1.reshape(-1, 1)))
+    middle = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
+    
+    bottom = np.hstack(((c2.T @ Vp).reshape(1,-1), np.array(d22)))
+
+    Mat = np.vstack((top, middle, bottom))
+    # Right-hand side (Taylor approx)
+    sol = self.ode_solver(fun=self.f, t_span=[0.0, T], y0=y + Delta_q,
+                        t_eval=[T], method=self.method,
+                        jac=self.Jacf,
+                        rtol=1e-7, atol=1e-9)
+    
+    r_y0_deltaq = sol.y[:, -1] - y
+    B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s]),np.array([m])))
+
+    XX, residues,rank,sing_val = lstsq(a=Mat,b=-B, lapack_driver='gelss')
+    Delta_p = Vp @ XX[:Vp.shape[1]]
+    Delta_T = XX[-1]
+
+    return Delta_p, Delta_T, B
+def Newton_Picard_IRAM(self, y0, T_0, v0, p0, pe, rho, Max_iter, epsilon):
+    """----------Initialization--------"""
+    y_star = y0
+    y_prev = y0
+    T_star = T_0
+    norm_delta_y = 1
+    p = p0
+    y_by_iter = np.zeros((Max_iter, self.dim))
+    T_by_iter = np.zeros(Max_iter)
+    Norm_B = np.zeros(Max_iter)
+    Abs_Err = np.zeros(Max_iter)
+    Rel_Err = np.zeros(Max_iter)
+    """----------------Shooting loop---------------------------"""
+    for k in range(Max_iter):
+        """------Step1: Integrate up to T_star to get phi_T"""
+        sol = self.ode_solver(self.f, [0.0, T_star], y_star, t_eval=[T_star],
+                        method=self.method,jac=self.Jacf ,rtol=1e-7, atol=1e-9)
+        # phi_T = sol.y[:, -1]
+        """------Step 2: Compute dominant subspace via the IRAM method"""
+        eigenvals, Ve = self.base_Vp(v0, y_star, T_star, p + pe, epsilon)
+        Ve = np.real(Ve) #Ce n'est pas la base complete
+        # Re-orthonormalize (QR)
+        Ve, _ = np.linalg.qr(Ve)
+        p = max(p0,np.sum(np.abs(eigenvals) > rho))
+
+        # Schur decomposition of Se = Ve^T M Ve
+        We = np.column_stack([
+            self.monodromy_mult(y_star, T_star, Ve[:, j],
+                                method=2, epsilon=1e-6)
+            for j in range(Ve.shape[1])
+        ])
+        Se = Ve.T @ We
+        Re, Ye = schur(Se, output='real')
+        Vp = Ve @ Ye[:, :p]
+        #________________________________________________________________#
+        """------Step 3: Picard correction (NPGS(l=2))-----------------"""
+        VpVpT = Vp @ Vp.T
+        Delta_q = (np.eye(self.dim) - VpVpT) @ (sol.y[:, -1] - y_star)
+        Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star, T_star, Delta_q, method=2, epsilon=1e-6) + (sol.y[:, -1] - y_star))
+        #_________________________________________________________________#
+        """------Step 4: Newton correction------------------------------"""      
+        Wp = np.column_stack([
+            self.monodromy_mult(y_star, T_star, Vp[:, j],
+                                method=2, epsilon=1e-6)
+            for j in range(p)
+        ])
+        Sp = Vp.T @ Wp
+        # Phase condition
+        d11 = 0
+        c1 = self.f(T_star, y_prev)
+        s = ((y_star + Delta_q) - y_prev) @ self.f(T_star, y_prev)
+        b1 = Vp.T @ self.f(T_star, sol.y[:, -1])
+        # Build augmented linear system [A | b]
+        top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
+        bottom = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
+        Mat = np.vstack((top, bottom))
+
+        # Right-hand side (Taylor approx)
+        sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],
+                        method=self.method,jac=self.Jacf, rtol=1e-7, atol=1e-9)
+        r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
+        B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
+        #________________________________________________________________#
+        """-----Step 5: Solve linear system for Delta_p (Delta_y = Delta_q + Vp @ Delta_p) and Delta_T"""
+        XX = solve(Mat, -B)
+        Delta_y = Delta_q + Vp @ XX[:p]
+        Delta_T = XX[-1]
+        #________________________________________________________________#
+        """------Step 6: Update guess----------------------------------"""
+        y_prev = y_star
+        y_star += Delta_y
+        T_star += Delta_T
+        #________________________________________________________________#
+        """------Step 7: Convergence check-------------------------------"""
+        norm_delta_y = np.linalg.norm(Delta_y, ord=np.inf)
+        y_by_iter[k, :] = y_star
+        T_by_iter[k] = T_star
+        Abs_Err[k] = norm_delta_y
+        Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+        Norm_B[k] = np.linalg.norm(B,ord=np.inf)
+
+        print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}, p = {p}")
+        print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}")
+        print(f"$||Delta q||$= {np.linalg.norm(Delta_q, ord=np.inf):.3e}")
+        print(f"$||Delta p||$ = {np.linalg.norm(Vp @ XX[:p], ord=np.inf):.3e}")
+
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1 #Will be used for the continuation process
+            break
+        else: 
+            converged = 0        
+    # Final monodromy matrix computation
+    # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
+
+    return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
+
+def NP_mass_conserv2(self,model,y0,T_0,alpha_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
+    """----------Initialization--------"""
+    y_star = y0.copy()
+
+    y_prev = y0.copy()
+    T_star = T_0
+    alpha = alpha_0
+    y_by_iter = np.zeros((Max_iter, self.dim))
+    T_by_iter = np.zeros(Max_iter)
+    Norm_B = np.zeros(Max_iter)
+    mass = np.zeros((Max_iter))
+    Abs_Err = np.zeros(Max_iter)
+    Rel_Err = np.zeros(Max_iter)
+    Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
+    p = p0
+    I = np.eye(self.dim)
+    H = h*np.ones_like(y_star)
+    m0 = H @ y0
+    T_unit = 1.0
+    unscaled_f = model.dydt
+
+    #Initial projectors
+    # P = Ve[:,:p] @ Ve[:,:p].T
+    # Q = I - P
+    # y_picard = Q @ y_star
+    # y_newton = P @ y_star
+
+    """----------------Shooting loop---------------------------"""
+    for k in range(Max_iter):
+        self.f = (lambda t, y: T_star*(unscaled_f(t,y) - alpha*H))
+        self.Jacf = (lambda t, y: T_star*(model.jacobian(t,y) ))
+        # Step 1: Solve the ODE to get phi(T)
+        phi_interp = self.ode_solver(
+            fun=self.f, t_span=[0.0, T_unit], t_eval=[T_unit], y0=y_star,
+            method=self.method, rtol=1e-7, atol=1e-9, jac=self.Jacf
+        )
+        phi_T = phi_interp.y[:, -1].copy()
+        #________________________________________________________________#
+        """------Step 2: Compute dominant subspace via subspace iteration with projection"""
+        #Deciding whether to use the full subspace iteration or the subspace iteration with projection
+        nu_sub = subsp_iter if (full_sub_iter or k==0) else 1
+        Re, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_unit,rho,p0, pe, nu_sub, epsilon)
+        p = max(p0, p_1)  # Ensure p > 0
+        Vp = Ve @ Ye[:, :p]
+        #________________________________________________________________#
+        """------Step 3: Picard correction (NPGS(l=2))-----------------"""
+        #Update the projectors
+        # P = Vp @ Vp.T
+        # Q = np.eye(self.dim) - P
+
+        Delta_q = self.picard_correction(y = y_star,T = T_unit,r = phi_T-y_star, Vp=Vp,l=l)
+
+        #_________________________________________________________________#
+        """-----------Step 4: Newton correction------------------------------"""
+        # Wp = M @ Vp 
+        Wp = We[:,:p]
+        Delta_p , Delta_T, Delta_alpha, B = self.Newton_correction_mass(unscaled_f=unscaled_f,
+            y = y_star, phi_T=phi_T ,T_star = T_star,alpha=alpha, Vp = Vp, Wp = Wp, 
+            Delta_q = Delta_q, y_prev = y_prev, H = H, m0 = m0
+        )
+
+        Delta_y = Delta_q + Delta_p
+        #________________________________________________________________#
+        """------Step 6: Update guess----------------------------------"""
+        y_prev = y_star
+        y_star += Delta_y
+        # y_picard += Delta_q
+        # y_picard = Q @ y_star
+        # y_newton += Delta_p
+        # y_newton = P @ y_star
+        T_star += Delta_T
+        alpha += Delta_alpha
+        # print('Norm y_picard - Q @ y_star = ', np.linalg.norm(y_picard - Q @ y_star, ord=np.inf))
+        # print('Norm y_newton - P @ y_star = ', np.linalg.norm(y_newton - P @ y_star, ord=np.inf))   
+        #________________________________________________________________#
+        """----Step 7: Convergence check-------------------------------"""
+        y_by_iter[k, :] = y_star
+        mass[k] = np.abs(H @ y_star - m0)
+        Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+        Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+        T_by_iter[k] = T_star
+        Norm_B[k] = np.linalg.norm(B,ord=np.inf)
+        
+        # mass_Q = h*np.sum(Q@y_star, axis=0)
+        # mass_N = h*np.sum(P@y_star, axis=0)
+
+
+        print('_________________________________________________________________________________\n')
+        print(f"Iteration {k}, min_mass y = {np.min(mass[k])}, max_mass y = {np.max(mass[k])}")
+        # print(f"iteration {k}:, min_mass Q = {np.min(mass_Q)}, max_mass Q = {np.max(mass_Q)}") 
+        # print(f"iteration {k}:, min_mass N = {np.min(mass_N)}, max_mass N = {np.max(mass_N)}")             
+        print(f"err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}, p = {p}")
+        print(f"alpha = {alpha:.5f}")
+        print(f"$||err_rel(y)||$ = {Rel_Err[k]:.3e}")
+        print(f"$||Delta q||$ = {np.linalg.norm(Delta_q,ord=np.inf):.3e}")
+        print(f"$||Delata p|| $= {np.linalg.norm(Delta_p,ord=np.inf):.3e}")
+
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1
+            break
+        else: 
+            converged = 0
+    # Final monodromy matrix computation
+    # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
+    return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+
+
+def Newton_mass_conserv3(self,y0,T_0, Max_iter, epsilon,h=1):
+    #________________________________INITIALISATION_________________________________
+    Y_star, Y_prev = y0.copy(), y0.copy()
+    y_star = Y_star[:-1]
+    y_prev = Y_prev[:-1]
+    T_star = T_0
+
+    alpha = Y_star[-1]
+
+    y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)), np.zeros((Max_iter))
+    # alpha_by_iter = np.zeros((Max_iter))
+    Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+    mass = np.zeros((Max_iter))
+    Rel_Err = np.zeros((Max_iter))
+    I = np.eye(self.dim)
+    H = h*np.ones(self.dim)
+    
+    H[-1] = 0 #No contribution from alpha variable 
+    # H[-2] = 0
+
+    m0 = H @ y0
+    
+    # T_star = y_star[-1]
+    #______________________________Newton iteration loop________________
+    for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
+        
+        #Soving the whole system over one period
+        phi_T, monodromy = self.integ_monodromy(Y_star,I,T_star)
+
+    #Selecting the phase-condition
+    #The orthogonality phase condition is imposed
+        d = 0
+        # c = self.f(T_star,y_prev)
+        c = self.f(T_star,Y_prev)
+        s = (Y_star - Y_prev) @ self.f(T_star,Y_prev)
+        bb = self.f(T_star, phi_T)
+
+        #Mass conservation condition
+        m = H @ Y_star - m0
+        #c2 = H #derivative wrt y
+        d22 = H @ self.f(T_star,Y_star) #- self.f(T,self.y0)) #0 #derivative wrt T
+
+        #Concat the whole matrix
+        top = np.hstack((monodromy - I, bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+        #
+        middle = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+        
+        
+        # A31 = H @ I
+        # bottom = np.hstack(((H.T).reshape(1,-1) ,np.array([[d22]]))) #Horizontal stacking of A31=H.Jacf and A32=0
+        Mat = np.vstack((top,middle))#,bottom))  # Vertical stacking of the three rows
+
+        #Right hand side concatenation
+        B = np.concatenate((phi_T - Y_star, np.array([s])))#,np.array([m])))   #np.array([s(T_star,y_star)])))
+        
+        
+        # XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelss') #Contain Delta_X and Delta_T
+
+        XX = solve(Mat, -B)
+
+        Delta_Y = XX[:self.dim]
+        # Delta_y = XX[:self.dim-1]
+        # Delta_aplha = Delta_Y[-1]
+        Delta_T = XX[-1]
+        
+        #Updating
+        Y_prev = Y_star
+        Y_star += Delta_Y
+        # y_prev = y_star
+        # y_star += Delta_y
+        T_star += Delta_T
+        alpha += Delta_Y[-1]
+
+        Abs_Err[k] = np.linalg.norm(Delta_Y[:-1], ord=np.inf)
+        Rel_Err[k] = Abs_Err[k]/np.linalg.norm(Y_star[:-1], ord=np.inf)
+        Norm_B[k] = np.linalg.norm(B, ord=np.inf)
+        y_by_iter[k,:] = Y_star
+        
+        T_by_iter[k] = T_star
+        # alpha_by_iter[k] = alpha
+
+        mass[k] = H @ Y_star  #h*np.sum(y_star[:-1], axis=0)
+
+        print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+        print(f"iteration {k}, alpha = {alpha:.5f}")
+        
+        # y_by_iter[k,:] = y_star
+        print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}")
+        print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}")
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1
+            break
+        else: 
+            converged = 0
+
+        #T_by_iter = y_by_iter[:, -1]
+    return k, y_by_iter, T_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+
+def subsp_iter_projec2(    
+    self,
+    Ve_ini : any,
+    y : any, 
+    T : float,
+    rho : float,
+    p0 : int,
+    pe : int,
+    max_iter : int,
+    phi_t : Optional[any] = None,
+    tol: float = None
+    ):   
+    Ve = Ve_ini.copy()
+    # MV = LinearOperator((self.dim,self.dim),matmat = lambda V : self.monodromy_mult(y, T, V, method = 2, epsilon = 1e-6))
+    
+    for k in range(max_iter):
+        # Apply monodromy operator to each vector in Ve
+        We = np.column_stack([
+            self.monodromy_mult_matvec(y, T, Ve[:, j], method=2, epsilon=1e-6)
+            for j in range(p0 + pe)
+        ])
+        # We = MV @ Ve
+        # We = self.monodromy_mult_matvec(y, T, Ve, method = 2, epsilon = 1e-6)
+        # Project back onto the current subspace (basic projection step)
+        Se = Ve.T @ We
+        # Schur decomposition (real) of the small matrix Se
+        Re, Ye,p = schur(Se, output='real',sort= lambda x,y: np.sqrt(x**2 + y**2) > rho)
+        # Rotate Ve using the sorted Schur vectors
+        Ve_new = We @ Ye
+        # Re-orthonormalize (QR)
+        Ve, _ = np.linalg.qr(Ve_new)
+
+        # (Optional) Check convergence Grassmann distance
+        # if np.linalg.norm(Ve - Ve_old) < tol:
+        #     print("Convergence with tolerance reached") 
+        #     break
+    return Re, Ye, Ve, We, p
+
+def subspace_iter(self,
+                    y,Ve_ini, T, phi_t, p0, pe, max_iter):
+    Ve = Ve_ini.copy()
+    for k in range(max_iter):
+        # Ve = MVe
+        # Ve = np.column_stack([
+        #     self.monodromy_mult2(T, Ve[:, j],phi_t)
+        #     for j in range(p0 + pe)
+        # ])
+        Ve = np.column_stack([
+            self.monodromy_mult(y, T, Ve[:, j], method=2, epsilon=1e-6)
+            for j in range(p0 + pe)
+        ])
+        Ve, _ = np.linalg.qr(Ve)
+        #Stoping criterion in term of eigenvalues of Re in the real Schur decomposition
+
+    return Ve
+
+def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5):
+    """----------Initialization--------"""
+    y_star = y0
+    y_prev = y0
+    T_star = T_0
+    p = p0
+    Ve = Ve_0
+    y_by_iter = np.zeros((Max_iter, self.dim))
+    T_by_iter = np.zeros(Max_iter)
+    Norm_B = np.zeros(Max_iter)
+    Abs_Err = np.zeros(Max_iter)
+    Rel_Err = np.zeros(Max_iter)
+    """----------------Shooting loop---------------------------"""
+    for k in range(Max_iter):
+        """------Step1: Integrate up to T_star to get phi_T"""
+        phi_interp = self.ode_solver(fun = self.f, t_span = [0.0, T_star], y0 = y_star,
+                                        t_eval=[T_star],
+                                        jac = self.Jacf,
+                        dense_output=False, #Return a continuous solution if set to true
+                        method=self.method, rtol=1e-7, atol=1e-9)
+        
+        # phi_t = interp1d(sol.t, sol.y, kind='cubic', fill_value="extrapolate") #Interpolating the solution to use it in the variational formulation
+        phi_T = phi_interp.y[:, -1]
+        """------Step 2: Compute dominant subspace via the IRAM method"""
+        Ve = self.subspace_iter(y_star, Ve,T_star, phi_interp,p,pe,subsp_iter)
+        # Schur decomposition of Se = Ve^T M Ve
+        We = np.column_stack([
+            # self.monodromy_mult2(T_star, Ve[:, j], phi_interp)
+            self.monodromy_mult(y_star, T_star, Ve[:, j], method=2, epsilon=1e-6)
+            for j in range(Ve.shape[1])
+        ])
+        Se = Ve.T @ We
+        Re, Ye, p_1= schur(Se, output='real',sort= lambda x,y: np.sqrt(x**2 + y**2) > rho)
+        p = max(p0, p_1)
+        # Ve = Ve@Ye[:,:p+pe]
+        Vp = Ve[:,:p]
+        #________________________________________________________________#
+        """------Step 3: Picard correction (NPGS(l=2))-----------------"""
+        VpVpT = Vp @ Vp.T
+        Delta_q = (np.eye(self.dim) - VpVpT) @ (phi_T - y_star)
+        # Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult2(T_star, Delta_q, phi_interp) + (phi_interp.y[:, -1] - y_star))
+        Delta_q = (np.eye(self.dim) - VpVpT) @ (self.monodromy_mult(y_star,
+                        T_star, Delta_q, method=2, epsilon=1e-6) + (phi_T - y_star))
+        #_________________________________________________________________#
+        """------Step 4: Newton correction------------------------------"""      
+        Wp = np.column_stack([
+            # self.monodromy_mult2(T_star, Vp[:, j],phi_interp)
+            self.monodromy_mult(y_star, T_star, Vp[:, j], method=2, epsilon=1e-6)
+            for j in range(p)
+        ])
+        Sp = Vp.T @ Wp
+        # Phase condition
+        d11 = 0
+        c1 = self.f(T_star, y_prev)
+        s = ((y_star + Delta_q) - y_prev) @ c1
+        b1 = Vp.T @ self.f(T_star, phi_T)
+        # Build augmented linear system [A | b]
+        top = np.hstack((Sp - np.eye(p), b1.reshape(-1, 1)))
+        bottom = np.hstack(((c1.T @ Vp).reshape(1, -1), np.array([[d11]])))
+        Mat = np.vstack((top, bottom))
+
+        # Right-hand side (Taylor approx)
+        sol = self.ode_solver(self.f, [0.0, T_star], y_star + Delta_q, t_eval=[T_star],jac=self.Jacf,
+                        method=self.method, rtol=1e-7, atol=1e-9)
+        r_y0_deltaq = sol.y[:, -1] - y_star #+ Delta_q
+        B = np.concatenate((Vp.T@r_y0_deltaq, np.array([s])))
+        #________________________________________________________________#
+        """-----Step 5: Solve linear system for Delta_p (Delta_y = Delta_q + Vp @ Delta_p) and Delta_T"""
+        XX = solve(Mat, -B)
+        Delta_y = Delta_q + Vp @ XX[:p]
+        Delta_T = XX[-1]
+        #________________________________________________________________#
+        """------Step 6: Update guess----------------------------------"""
+        y_prev = y_star.copy()
+        y_star += Delta_y
+        T_star += Delta_T
+        #________________________________________________________________#
+        """------Step 7: Convergence check-------------------------------"""
+        y_by_iter[k, :] = y_star
+        T_by_iter[k] = T_star
+        Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+        Norm_B[k] = np.linalg.norm(B, ord=np.inf)
+
+        print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}, p = {p}")
+        print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}") 
+        print(f"$||Delta q||$ = {np.linalg.norm(Delta_q, ord=np.inf):.3e}")
+        print(f"$||Delta p||$ = {np.linalg.norm(Vp @ XX[:p], np.inf):.3e}")
+
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1 #Will be used for the continuation process
+            break
+        else: 
+            converged = 0        
+    # Final monodromy matrix computation
+    # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
+
+    return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged

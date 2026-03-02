@@ -1,7 +1,8 @@
 from pathlib import Path
 import pickle
 import numpy as np
-from utility import orbit, Mckean_Vlasov,call_method 
+from utility import orbit,call_method
+from models import Mckean_Vlasov
 import datetime
 from scipy.integrate import solve_ivp
 
@@ -86,7 +87,7 @@ if __name__ == "__main__":
     # A loop to compute the branch of solutions wrt the Intensity I
     # I_values = np.linspace(1.0, 1.2, 15)  # Example intensity values
     T = model.T_ini
-    I_max = 1.5
+    I_max = 1.026
     cont_step = 0.013
 
     solutions = []
