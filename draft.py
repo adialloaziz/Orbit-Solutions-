@@ -603,6 +603,85 @@ def Newton_Picard_IRAM(self, y0, T_0, v0, p0, pe, rho, Max_iter, epsilon):
 
     return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
 
+def Newton_mass_conserv(self,y0,T_0, Max_iter, epsilon,h=1):
+    #h is the spatial step size
+    #________________________________INITIALISATION_________________________________
+    y_star, y_prev, T_star = y0.copy(), y0.copy(), T_0
+
+    y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
+    Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+    mass = np.zeros((Max_iter))
+    Rel_Err = np.zeros((Max_iter))
+    I = np.eye(self.dim)
+    H = h*np.ones_like(y_star)
+    m0 = H @ y0
+    #______________________________Newton iteration loop________________
+    for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
+        
+        #Soving the whole system over one period
+        phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
+
+    #Selecting the phase-condition
+    #The orthogonality phase condition is imposed
+        d = 0
+        # c = self.f(T_star,y_prev)
+        c = self.f(T_star,y0)
+        s = (y_star - y0) @ self.f(T_star,y0)
+        # s = (y_star - y_prev)@self.f(T_star,y_prev)
+        bb = self.f(T_star, phi_T)
+
+        #Mass conservation condition
+        m = H @ (y_star - y0)
+        #c2 = H #derivative wrt y
+        d22 = H @ (self.f(T_star,y_star) - self.f(T_star,self.y0)) #0 #derivative wrt T
+
+
+
+        #Concat the whole matrix
+        top = np.hstack((monodromy - I, bb.reshape(-1,1)))  # Horizontal stacking of A11=M-I and A12=b
+        #
+        middle = np.hstack((c.reshape(1,-1),np.array([[d]])))  # Horizontal stacking of A21=c and A22=d
+        
+        #Mass conservation condition
+        #H.Jacf with H = [1,1,...,1] 
+        # H = h*np.ones((1,self.dim))
+        
+        # A31 = H @ I
+        bottom = np.hstack(((H.T).reshape(1,-1) ,np.array([[d22]]))) #Horizontal stacking of A31=H.Jacf and A32=0
+        Mat = np.vstack((top, middle,bottom))  # Vertical stacking of the three rows
+
+        #Right hand side concatenation
+        B = np.concatenate((phi_T - y_star, np.array([s]), np.array([m])))   #np.array([s(T_star,y_star)])))
+        
+        
+        XX, residues,rank,sing_val = lstsq(Mat,-B,lapack_driver='gelss') #Contain Delta_X and Delta_T
+        Delta_y = XX[:self.dim]
+        Delta_T = XX[-1]
+        
+        #Updating
+        y_prev = y_star
+        y_star += Delta_y
+        T_star += Delta_T
+        Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+        Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+        Norm_B[k] = np.linalg.norm(B, ord=np.inf)
+        y_by_iter[k,:] = y_star
+        mass[k] = h*np.sum(y_star, axis=0)
+
+        print(f"Iteration {k}, min_mass = {np.min(mass[k])}, max_mass = {np.max(mass[k])}")               
+        # y_by_iter[k,:] = y_star
+        T_by_iter[k] = T_star
+        print(f"Iteration {k}:err_abs(y)$ = {Abs_Err[k]:.3e}, T = {T_star:.5f}")
+        print(f"$|| err_rel(y) ||$ = {Rel_Err[k]:.3e}")
+        if Rel_Err[k] <= epsilon:
+            print(f"Precision reached within {k+1} iterations")
+            converged = 1
+            break
+        else: 
+            converged = 0
+
+    return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+
 def NP_mass_conserv2(self,model,y0,T_0,alpha_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
     """----------Initialization--------"""
     y_star = y0.copy()
@@ -964,3 +1043,119 @@ def Newton_Picard_simple(self, y0, T_0, Max_iter, epsilon, subsp_iter=1, Ve_0 = 
     # phi_T, monodromy = self.integ_monodromy(y_star, T_star)
 
     return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged
+
+
+def dydt_scal(self, t, rho):
+    "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation with time scaling"
+
+    return np.append(self.dydt(t, rho[:-1]) * rho[-1],0)
+    
+def jacobian_scal(self, t, rho):
+    """Jacobian of the right hand side of the Mckean-Vlasov equation with time scaling"""
+    J = self.jacobian(t, rho[:-1])
+    n = self.n_z - 1
+    #Append the last row and column for the time scaling
+    J_scal = np.zeros((n+1, n+1))
+    J_scal[:n,:n] = J * rho[-1]
+    J_scal[:n,-1] = self.dydt(t, rho[:-1])
+    return J_scal
+def dydt_1(self, t, rho):
+    "rhs of the discretized Mckean-Vlasov equation"
+    #We let the intensity of the interaction as a variable
+    return np.append(self.dydt(t, rho[:-1]),0)
+def jacobian_1(self, t, rho):
+    """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+    J = self.jacobian(t, rho[:-1])
+    n = self.n_z - 1
+    #Append the last row and column for the intensity of the interaction
+    J_1 = np.zeros((n+1, n+1))
+    J_1[:n,:n] = J
+    J_1[:n,-1] = self.C_mat @ rho[:-1]
+    return J_1
+
+
+def dydt_dissip(self, t, rho):
+    "rhs of the discretized dissipative Mckean-Vlasov equation"
+    #Augmented rho with the unfolding parameter alpha
+    #T= rho[-2], alpha = rho[-1]
+    
+    T=self.T_ini
+    alpha=self.alpha
+    grad_H = np.ones_like(rho) #Gradient of the fisrt integral function: The mass
+
+    return T*(self.dydt(t,rho) - alpha*grad_H)
+
+def dydt_dissip2(self, t, rho,m0=1):
+    "rhs of the discretized dissipative Mckean-Vlasov equation"
+    #Augmented rho with the time scaling variable and the unfolding parameter alpha
+    #T= rho[-2], alpha = rho[-1]
+    n = self.n_z - 1
+    grad_H = np.ones(n)
+
+    return np.append(self.dydt(t, rho[:-1]) - rho[-1]*grad_H, grad_H@rho[:-1]-self.m0)
+
+def jacobian_dissip2(self, t, rho):
+    """Jacobian of the right hand side of the dissipative Mckean-Vlasov equation"""
+    J = self.jacobian(t, rho[:-1])
+    n = self.n_z - 1
+    grad_H = np.ones(n)
+    #Append the last row and column for the unfolding parameter
+    J_dissip = np.zeros((n+1, n+1))
+    J_dissip[:n,:n] = J * rho[-1]
+    J_dissip[:n,-1] = -grad_H
+    J_dissip[-1,:n] = grad_H
+
+    return J_dissip
+
+def jacobian_dissip(self, t, rho):
+    """Jacobian of the right hand side of the dissipative Mckean-Vlasov equation"""
+    # 
+    T = self.T_ini
+    
+    return T*self.jacobian(t, rho)
+
+def jacobian_optim(self, t, rho):
+    """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+    _, x_centers, h = self.mesh1D
+    n = self.n_z - 1
+    h_sq = h * h
+
+    # Compute potential and differences
+    V = self.V(x_centers, rho)
+    V_diff = np.diff(V)
+
+    # Compute Bernoulli functions
+    B_m = self.Bernoulli(-V_diff)
+    B_p = self.Bernoulli(V_diff)
+
+    # Build linear part diagonal elements
+    diag_J = np.empty(n)
+    diag_J[0] = -B_p[0]
+    diag_J[1:-1] = -(B_m[:-1] + B_p[1:])
+    diag_J[-1] = -B_m[-1]
+
+    # Create sparse linear Jacobian
+    J_linear = sp.sparse.diags(
+        [B_p, diag_J, B_m],
+        [-1, 0, 1],
+        shape=(n, n),
+        format='csr'
+    )
+
+    # Compute nonlinear flux contribution
+    B_prime_m = self.derivative_Bernoulli(-V_diff)
+    B_prime_p = self.derivative_Bernoulli(V_diff)
+
+    # Compute convolution difference efficiently
+    Convol_dif = np.diff(self.C_mat, axis=0, prepend=0)
+    
+    # Compute diagonal for flux derivatives
+    temp = B_prime_m * rho[1:] + B_prime_p * rho[:-1]
+    temp = np.append(temp, 0)
+    
+    # Apply diagonal and compute flux derivatives
+    flux_p_deriv = -temp[:, np.newaxis] * Convol_dif
+    flux_m_deriv = np.roll(flux_p_deriv, shift=1, axis=0)
+    
+    # Combine components
+    return np.asarray((J_linear.to_array() + flux_p_deriv - flux_m_deriv)) / h_sq

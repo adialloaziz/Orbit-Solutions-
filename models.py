@@ -260,6 +260,7 @@ class Mckean_Vlasov:
         self.read_params()
         self.mesh1D = self.mesh_1D()  # Initialize the mesh
         self.C_mat =self.Conv_mat()  # Precompute the convolution matrix for the Haissinski kernel
+        self.C_mat_kuramoto = self.Conv_mat_kuramoto() #Precompute the convolution matrix for the Kuramoto potential
         
     def update_params(self, **kwargs):
         for key, value in kwargs.items():
@@ -271,6 +272,8 @@ class Mckean_Vlasov:
         if 'n_z' in kwargs:
             self.mesh1D = self.mesh_1D()  # Update the mesh if n_z changes
             self.C_mat = self.Conv_mat()  # Update the convolution matrix if n_z changes
+            self.C_mat_kuramoto = self.Conv_mat_kuramoto() #Update the convolution matrix for the Kuramoto potential if n_z changes
+
         
 
     def read_params(self): 
@@ -332,6 +335,8 @@ class Mckean_Vlasov:
                         self.alpha = float(res)
                     elif var == 'beta': #artificial parameter
                         self.beta = float(res)
+                    elif var == 'alpha_shift': #Shift parameter for the Kuramoto potential
+                        self.alpha_shift = float(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                     
@@ -360,29 +365,33 @@ class Mckean_Vlasov:
         # y = np.where(z<1e-8,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
         return np.where(z<1e-5,0, 2*(np.cosh(5*np.asinh(z)/3) - np.cosh(np.asinh(z)))/denom)
     
-    # def kuramoto_potential(self, z):
+    def kuramoto_potential(self, z):
 
-        # return np.cos(z - self.alpha_shift)
+        return -np.cos(z - self.alpha_shift)
     
     def Conv_mat(self):
         "The convolution matrix for the Haissinski kernel"
         _,z, h = self.mesh1D  # Get the mesh and centers
         #Convolution matrix
         return h*sp.linalg.convolution_matrix(self.Haissinski_kernel(z), len(z), mode='same') 
-
-        # C_mat = np.zeros((len(z), len(z))) # Initialize a matrix to hold the kernel values
-        # for i in range(len(z)):
-        #     C_mat[i,:] = self.Haissinski_kernel(z[i] - z)
-        # return C_mat
+    def Conv_mat_kuramoto(self):
+        "The convolution matrix for the Kuramoto potential"
+        _,z, h = self.mesh1D  # Get the mesh and centers
+        #Convolution matrix
+        return h*sp.linalg.convolution_matrix(self.kuramoto_potential(z), len(z), mode='same')
+        
     
     def V(self, z, rho):
         "The potential function"
         _,_, h = self.mesh1D
         # return  z*z/2 + self.I*(self.C_mat @ rho)  # Convolve the kernel with rho using matrix multiplication
         # return np.ones_like(z)
-        # y = rho[:,0] if rho.ndim > 1 else rho
         return z*z/2 + h*self.I*sp.signal.convolve(self.Haissinski_kernel(z), rho, mode='same', method='fft')
         # return z*z/2 + np.trapezoid(self.Haissinski_kernel(z) * rho)
+    def V_kuramoto(self, z, rho):
+        "The potential function with the Kuramoto kernel"
+        _,_, h = self.mesh1D
+        return h*self.I*sp.signal.convolve(self.kuramoto_potential(z), rho, mode='same', method='fft')
 
     def mesh_1D(self):
         "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
@@ -403,92 +412,51 @@ class Mckean_Vlasov:
         F_L = np.zeros_like(x_centers)  # Containining all the flux values
         #No flux on the boundaries
         F_L[1:] = B_m*rho[1:] - B_p*rho[:-1]
-        return self.D*F_L/(h*h)  # Flux of the density rho divided by h^2
+        return self.D*F_L/(h*h) 
+    
+    def flux_per(self,rho):
+        "Compute the flux of the density rho"
+        #We suppose a uniform mesh in the interval [xmin, xmax]
+        _, x_centers, h = self.mesh1D
+        V = self.V_kuramoto(x_centers, rho)  # Potential at the center of the cells
+
+        V_diff = np.zeros_like(x_centers)
+        V_diff[0] = V[0] - V[-1]
+        V_diff[1:] = np.diff(V)
+           
+        B_m = self.Bernoulli(-V_diff/self.D)
+        B_p = self.Bernoulli(V_diff/self.D)
+        F_L = np.zeros_like(x_centers)  # Containining all the flux values
+        #Periodic BCs
+        F_L[0] = B_m[0]*rho[0] - B_p[0]*rho[-1]
+        #Inner points
+        F_L[1:] = B_m[1:]*rho[1:] - B_p[1:]*rho[:-1]
+
+        return self.D*F_L/(h*h)
 
     
-    def dydt_scal(self, t, rho):
-        "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation with time scaling"
-
-        return np.append(self.dydt(t, rho[:-1]) * rho[-1],0)
-    
-    def jacobian_scal(self, t, rho):
-        """Jacobian of the right hand side of the Mckean-Vlasov equation with time scaling"""
-        J = self.jacobian(t, rho[:-1])
-        n = self.n_z - 1
-        #Append the last row and column for the time scaling
-        J_scal = np.zeros((n+1, n+1))
-        J_scal[:n,:n] = J * rho[-1]
-        J_scal[:n,-1] = self.dydt(t, rho[:-1])
-        return J_scal
 
     def dydt(self, t, rho):
         "Right hand side of the discretized(Finite Volume scheme) Mckean-Vlasov equation"
         # All parameters are fixed here 
 
         F_L = self.flux(rho)  # Flux of the density y
-
         # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
         # F_K = np.roll(F_L, shift=-1)
-        dydt = (np.roll(F_L, shift=-1) - F_L) # Sifting matrix to apply the finite volume scheme
+        dydt = (np.roll(F_L, shift=-1) - F_L)
         return dydt
     
-    def dydt_1(self, t, rho):
-        "rhs of the discretized Mckean-Vlasov equation"
-        #We let the intensity of the interaction as a variable
-        return np.append(self.dydt(t, rho[:-1]),0)
-    def jacobian_1(self, t, rho):
-        """Jacobian of the right hand side of the Mckean-Vlasov equation"""
-        J = self.jacobian(t, rho[:-1])
-        n = self.n_z - 1
-        #Append the last row and column for the intensity of the interaction
-        J_1 = np.zeros((n+1, n+1))
-        J_1[:n,:n] = J
-        J_1[:n,-1] = self.C_mat @ rho[:-1]
-        return J_1
-
-
-    def dydt_dissip(self, t, rho):
-        "rhs of the discretized dissipative Mckean-Vlasov equation"
-        #Augmented rho with the unfolding parameter alpha
-        #T= rho[-2], alpha = rho[-1]
-        
-        T=self.T_ini
-        alpha=self.alpha
-        grad_H = np.ones_like(rho) #Gradient of the fisrt integral function: The mass
-
-        return T*(self.dydt(t,rho) - alpha*grad_H)
     
-    def dydt_dissip2(self, t, rho,m0=1):
-        "rhs of the discretized dissipative Mckean-Vlasov equation"
-        #Augmented rho with the time scaling variable and the unfolding parameter alpha
-        #T= rho[-2], alpha = rho[-1]
-        n = self.n_z - 1
-        grad_H = np.ones(n)
-
-        return np.append(self.dydt(t, rho[:-1]) - rho[-1]*grad_H, grad_H@rho[:-1]-self.m0)
-    
-    def jacobian_dissip2(self, t, rho):
-        """Jacobian of the right hand side of the dissipative Mckean-Vlasov equation"""
-        J = self.jacobian(t, rho[:-1])
-        n = self.n_z - 1
-        grad_H = np.ones(n)
-        #Append the last row and column for the unfolding parameter
-        J_dissip = np.zeros((n+1, n+1))
-        J_dissip[:n,:n] = J * rho[-1]
-        J_dissip[:n,-1] = -grad_H
-        J_dissip[-1,:n] = grad_H
-
-        return J_dissip
-
-    def jacobian_dissip(self, t, rho):
-        """Jacobian of the right hand side of the dissipative Mckean-Vlasov equation"""
-        # 
-        T = self.T_ini
-        
-        return T*self.jacobian(t, rho)
+     
+    def dydt_per(self,t,rho):
+        F_L = self.flux_per(rho)  # Flux of the density y
+        # dydt = 1/(h*h) * (F_K- F_L)  # Finite Volume scheme
+        # F_K = np.roll(F_L, shift=-1)
+        dydt = (np.roll(F_L, shift=-1) - F_L)
+        return dydt
     
     def jacobian(self, t, rho):
-        """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+        """Jacobian wrt rho of the right hand side of the Mckean-Vlasov equation"""
         _, x_centers, h = self.mesh1D
         n = self.n_z - 1
         h_sq = h * h
@@ -521,66 +489,108 @@ class Mckean_Vlasov:
              
         
         J_non_lin = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
-        J_non_lin[0,:] = -(B_prime_m[0]*rho[1] + B_prime_p[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
+        J_non_lin[0,:] = -(B_prime_m[0]*rho[1] + B_prime_p[0]*rho[0])*self.I*(self.C_mat[1,:] - self.C_mat[0,:])
 
-        J_non_lin[-1,:] = (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*(self.C_mat[-1,:] - self.C_mat[-2,:])
+        J_non_lin[-1,:] = (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*self.I*(self.C_mat[-1,:] - self.C_mat[-2,:])
         
         for i in range(1,self.n_z-2):
-            flux_p = -(B_prime_m[i]*rho[i+1] + B_prime_p[i]*rho[i])*(self.C_mat[i+1,:] - self.C_mat[i,:])
+            flux_p = -(B_prime_m[i]*rho[i+1] + B_prime_p[i]*rho[i])*self.I*(self.C_mat[i+1,:] - self.C_mat[i,:])
 
-            flux_m = (B_prime_m[i-1]*rho[i] + B_prime_p[i-1]*rho[i-1])*(self.C_mat[i,:] - self.C_mat[i-1,:])
+            flux_m = (B_prime_m[i-1]*rho[i] + B_prime_p[i-1]*rho[i-1])*self.I*(self.C_mat[i,:] - self.C_mat[i-1,:])
 
 
             J_non_lin[i,:] = flux_p + flux_m
 
         return np.asarray((J_linear +J_non_lin))/h_sq
     
-
-    def jacobian_optim(self, t, rho):
-        """Jacobian of the right hand side of the Mckean-Vlasov equation"""
+    def jacobian_per(self, t ,rho):
+        """Jacobian wrt rho of the right hand side of the Mckean-Vlasov equation"""
         _, x_centers, h = self.mesh1D
         n = self.n_z - 1
         h_sq = h * h
 
         # Compute potential and differences
-        V = self.V(x_centers, rho)
-        V_diff = np.diff(V)
+        V = self.V_kuramoto(x_centers, rho)
+        V_diff = np.zeros_like(x_centers)
+        V_diff[0] = V[0] - V[-1]
+        V_diff[1:] = np.diff(V)
+        
 
         # Compute Bernoulli functions
-        B_m = self.Bernoulli(-V_diff)
-        B_p = self.Bernoulli(V_diff)
+        B_m = self.Bernoulli(-V_diff/self.D)
+        B_p = self.Bernoulli(V_diff/self.D)
 
         # Build linear part diagonal elements
-        diag_J = np.empty(n)
-        diag_J[0] = -B_p[0]
-        diag_J[1:-1] = -(B_m[:-1] + B_p[1:])
-        diag_J[-1] = -B_m[-1]
+        diag_J = np.zeros(n)
+        diag_J[0] = -B_p[1] - B_m[0]
+        diag_J[1:-1] = -(B_m[1:-1] + B_p[2:])
+        diag_J[-1] = -B_m[-1] - B_p[0]
 
-        # Create sparse linear Jacobian
+        # Create linear part sparse of the Jacobian
         J_linear = sp.sparse.diags(
-            [B_p, diag_J, B_m],
+            [B_p[1:], diag_J, B_m[1:]],
             [-1, 0, 1],
             shape=(n, n),
             format='csr'
         )
 
-        # Compute nonlinear flux contribution
-        B_prime_m = self.derivative_Bernoulli(-V_diff)
-        B_prime_p = self.derivative_Bernoulli(V_diff)
+        J_linear[0,-1] = B_p[0]
+        J_linear[-1,0] = B_m[0]
 
-        # Compute convolution difference efficiently
-        Convol_dif = np.diff(self.C_mat, axis=0, prepend=0)
+        # Compute nonlinear flux contribution
+        B_prime_m = self.derivative_Bernoulli(-V_diff/self.D)
+        B_prime_p = self.derivative_Bernoulli(V_diff/self.D)
+             
         
-        # Compute diagonal for flux derivatives
-        temp = B_prime_m * rho[1:] + B_prime_p * rho[:-1]
-        temp = np.append(temp, 0)
+        J_non_lin = np.zeros((self.n_z-1, self.n_z-1))  # Initialize the Jacobian matrix
+        # J_non_lin[0,:] = -(B_prime_m[0]*rho[1] + B_prime_p[0]*rho[0])*(self.C_mat[1,:] - self.C_mat[0,:])
+
+        # J_non_lin[-1,:] = (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*(self.C_mat[-1,:] - self.C_mat[-2,:])
         
-        # Apply diagonal and compute flux derivatives
-        flux_p_deriv = -temp[:, np.newaxis] * Convol_dif
-        flux_m_deriv = np.roll(flux_p_deriv, shift=1, axis=0)
+        flux_p = -(B_prime_m[1]*rho[1] + B_prime_p[1]*rho[0])*self.I*(self.C_mat_kuramoto[1,:] - self.C_mat_kuramoto[0,:])
+        flux_m = -(B_prime_m[0]*rho[0] + B_prime_p[0]*rho[-1])*self.I*(self.C_mat_kuramoto[-1,:] - self.C_mat_kuramoto[0,:])
+        J_non_lin[0,:] = flux_p + flux_m
+
+        flux_p = (B_prime_m[0]*rho[0] + B_prime_p[0]*rho[-1])*self.I*(self.C_mat_kuramoto[-1,:] - self.C_mat_kuramoto[0,:])
+        flux_m = (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*self.I*(self.C_mat_kuramoto[-1,:] - self.C_mat_kuramoto[-2,:])
+        J_non_lin[-1,:] = flux_p + flux_m
+
+        for i in range(1,self.n_z-2):
+            flux_p = -(B_prime_m[i+1]*rho[i+1] + B_prime_p[i+1]*rho[i])*self.I*(self.C_mat_kuramoto[i+1,:] - self.C_mat_kuramoto[i,:])
+
+            flux_m = (B_prime_m[i]*rho[i] + B_prime_p[i]*rho[i-1])*self.I*(self.C_mat_kuramoto[i,:] - self.C_mat_kuramoto[i-1,:])
+
+
+            J_non_lin[i,:] = flux_p + flux_m
+
+        return np.asarray((J_linear + J_non_lin))/h_sq
+   
+    def df_dI_per(self, t, rho):
+        "Derivative of the right hand side of the Mckean-Vlasov equation with respect to the interaction intensity I"
+        _, x_centers, h = self.mesh1D
+        V = self.V_kuramoto(x_centers, rho)  # Potential at the center of the cells
+        V_diff = np.zeros_like(x_centers)
+        V_diff[0] = V[0] - V[-1]
+        V_diff[1:] = np.diff(V)
+        # B_m = self.Bernoulli(-V_diff/self.D)
+        # B_p = self.Bernoulli(V_diff/self.D)
+        dV_dI = h*sp.signal.convolve(self.Haissinski_kernel(x_centers), rho, mode='same', method='fft')
+        # print("Shape of dV_dI:", dV_dI.shape)
+        B_prime_m = self.derivative_Bernoulli(-V_diff/self.D)
+        B_prime_p = self.derivative_Bernoulli(V_diff/self.D)
+        print("Shape of B_prime_m:", B_prime_m.shape)
+        dF_L_dI = np.zeros_like(x_centers)
+        #Periodic BCs
+        dF_L_dI[0] = -(B_prime_m[1]*rho[1] + B_prime_p[1]*rho[0])*(dV_dI[1] - dV_dI[0]) + (B_prime_m[0]*rho[0] + B_prime_p[0]*rho[-1])*(dV_dI[0] - dV_dI[-1])
+        dF_L_dI[-1] = (B_prime_m[0]*rho[0] + B_prime_p[0]*rho[-1])*(dV_dI[-1] - dV_dI[0]) + (B_prime_m[-1]*rho[-1] + B_prime_p[-1]*rho[-2])*(dV_dI[-1] - dV_dI[-2])
+
+        #Inner points
+        flux_p = -(B_prime_m[2:]*rho[2:] + B_prime_p[2:]*rho[1:-1])*(dV_dI[2:] - dV_dI[1:-1])
+        flux_m = (B_prime_m[1:-1]*rho[1:-1] + B_prime_p[1:-1]*rho[:-2])*(dV_dI[1:-1] - dV_dI[:-2])
         
-        # Combine components
-        return np.asarray((J_linear.to_array() + flux_p_deriv - flux_m_deriv)) / h_sq
+        dF_L_dI[1:-1] =  flux_p + flux_m
+
+        return dF_L_dI/(h*h)
 
 
     def dydt_new(self,t, rho):

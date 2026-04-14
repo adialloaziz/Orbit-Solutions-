@@ -88,6 +88,7 @@ if __name__ == "__main__":
     # I_values = np.linspace(1.0, 1.2, 15)  # Example intensity values
     T = model.T_ini
     I_max = 1.026
+    I_min = 0.97
     cont_step = 0.013
 
     solutions = []
@@ -101,9 +102,10 @@ if __name__ == "__main__":
     file = results_dir / f"branch_solutions_{today}.txt"
     file_pkl = results_dir / f"branch_solutions_{today}.pkl"
 
-    with open(file, "w") as f:
-        f.write("I_value\tTstar\tystar\n")
-        while ((model.I <= I_max) and (cont_step > 1e-4)):
+    with open(file, "w") as fic:
+        fic.write("I_value\tTstar\tystar\n")
+        # while ((model.I <= I_max) and (cont_step > 1e-4)):
+        while (model.I > I_min) and (cont_step > 1e-4):
             print(f"Computing solution for Intensity I = {model.I}")
             k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,"Newton_mass_conserv4",
                                                                                 model.p0,y0=y0,T=T, filename=None)            
@@ -111,7 +113,8 @@ if __name__ == "__main__":
             if converged == -1:
                 print("Branch continuation stopped due to divergence.")
                 cont_step /= 2  # Reduce the continuation step
-                model.I -= cont_step  # Step back
+                # model.I -= cont_step  # Step back
+                model.I += cont_step
                 continue  # Retry with a smaller step
             else:
                 if k <= 3:
@@ -121,11 +124,11 @@ if __name__ == "__main__":
                 y0 = y_by_iter[k]  # Update y0 for the next iteration
                 solutions.append((model.I, y0, T, mass[k],k))
 
-                model.I += cont_step  # Increment the Intensity for the next step
-            
+                # model.I += cont_step  # Increment the Intensity for the next step
+                model.I -= cont_step #Step back as we go down the branch
 
                 # Save intermediate results
-                f.write(f"{model.I}\t{T_by_iter[k]}\t{y_by_iter[k].tolist()}\n")
+                fic.write(f"{model.I}\t{T_by_iter[k]}\t{y_by_iter[k].tolist()}\n")
                 print("#-------------------------------------------------------------# \n")
 	    
                 # Save after each successful computation
