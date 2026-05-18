@@ -2,13 +2,13 @@ from pathlib import Path
 import pickle
 import numpy as np
 from utility import orbit,call_method
-from models import Mckean_Vlasov
+from models import Kuramoto
 import datetime
 from scipy.integrate import solve_ivp
 
 
 
-def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_dir, filename=None):
+def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_dir=None, filename=None):
 
     epsilon = model.precision
     model.n_z = n_z
@@ -56,29 +56,35 @@ def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_di
 if __name__ == "__main__":
     BASE_PATH = Path().parent.resolve()
 
-    param_file = BASE_PATH/"config_models/mckean_vlasov_param_1.in"
-    param_file_name = "mckean_vlasov_param_1.in"
-    # param_file = "./mckean_vlasov_param_1.in"  # file containing model parameters
-    model = Mckean_Vlasov(param_file)
-    print("Loaded parameters:", model.n_z)
+    param_file = BASE_PATH/"config_models/kuramoto_param.in"
+    param_file_name = "kuramoto_param.in"# file containing model parameters
+    # param_file = "./kuramoto_param.in"  # file containing model parameters
+    model = Kuramoto(param_file)
+    print("Loaded parameters of the Kuramoto model with a phase discretization of:", model.n_z)
     
     
 
     f = model.dydt
     J = model.jacobian
 
-    z, z_centers, h = model.mesh1D  # Get the mesh and centers
+    _, z_centers, h = model.mesh1D  # Get the mesh and centers
     
 
     # Initial condition
-    # y0 = np.ones_like(z_centers)
-    init_file = BASE_PATH /f"Results/{param_file_name}/file_init_2026-04-16.pkl"
+    init_file = BASE_PATH /f"config_models/init_kuramoto_2026_05_18.pkl"
     with open(init_file, 'rb') as fic:
         data = pickle.load(fic)
-        y_0 = data['y']
-        T = data['T']
-        I_min = data['I']
+    y_0 = data['y_0']
+    T = data['T']
+    model.alpha_shift = data['alpha_shift']
+    I_min = data['I']
 
+    # model.alpha_shift = np.pi/3
+    Ic = 2/np.cos(model.alpha_shift)
+    # I_min = 1.5*Ic
+    I_max = 2.5*Ic
+    model.I = I_min
+    # y_0 = (1/(2*np.pi))*np.ones_like(z_centers)+0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
     print(f"starting from I ={I_min:.3f}, T ={T:.3f}")
     H = h*np.ones_like(y_0)
     model.m0 = float(H @ y_0)
@@ -93,17 +99,15 @@ if __name__ == "__main__":
     print('Mass at the starting point:', H@y_0)
 
     # A loop to compute the branch of solutions wrt the Intensity I
-    I_max = 1.44
-    model.I = I_min
-    # I_min = 1.0
-    tangent_dir = np.concatenate((1e-4*np.ones_like(y_0), [1.e-4], [1e-4],[1e-4])) #Initial tangent direction for the continuation (dy/deta, dT/deta, dI/deta, dalpha/deta)
-    step_cont = 0.02
+    
+    # tangent_dir = np.concatenate((1e-4*np.ones_like(y_0), [1.e-4], [1e-4],[1e-4])) #Initial tangent direction for the continuation (dy/deta, dT/deta, dI/deta, dalpha/deta)
+    step_cont = 0.1
 
     solutions = []
     today = datetime.date.today()
 
     results_dir = BASE_PATH / f"Results/{param_file_name}"
-
+    results_dir.mkdir(parents=True, exist_ok=True)
     # results_dir = Path(results_dir)
     print("Results will be saved in:", results_dir)
     file = results_dir / f"branch_solutions_{today}.txt"
@@ -116,12 +120,10 @@ if __name__ == "__main__":
             print(f"Computing solution for Intensity I = {model.I} \nContinuation stepsize = {step_cont}")
             # k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,"Newton_mass_conserv4",
             #                                                                     model.p0,y_0=y_0,T=T, filename=None)
-            k, T_by_iter, y_by_iter, I_by_iter, alpha_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, tangent_dir = run(model,f, J, model.n_z,"Newton_mass_cont_correct",
-                                                                                model.p0, T=T, y_0=y_0,I_0=model.I,alpha_0=model.alpha,tangent_dir=tangent_dir,step_cont=step_cont, filename=None)         
-            dy_deta = tangent_dir[:len(y_0)]
-            dT_deta = tangent_dir[len(y_0)]
-            dI_deta = tangent_dir[len(y_0)+1]
-            dalpha_deta = tangent_dir[len(y_0)+2]
+            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,
+                                                                                     "Newton_mass_conserv4",
+                                                                                model.p0, T=T, y_0=y_0,I_0=model.I,
+                                                                                alpha_0=model.alpha,step_cont=step_cont)
             if converged == -1:
                 print("Branch continuation stopped due to divergence.")
                 step_cont /= 2  # Reduce the continuation step
@@ -132,14 +134,15 @@ if __name__ == "__main__":
                 if k <= 3:
                     step_cont *= 2 # Increase the continuation step if convergence was fast
 
-                T = T_by_iter[k] + step_cont*dT_deta  # Update T for the next iteration
-                y_0 = y_by_iter[k] + step_cont*dy_deta  # Update y_0 for the next iteration
+                T = T_by_iter[k] # Update T for the next iteration
+                y_0 = y_by_iter[k]  # Update y_0 for the next iteration
                 # model.alpha  += step_cont*dalpha_deta  # Update alpha for the next iteration
-                model.I += step_cont*dI_deta  # Update I for the next iteration
+                coef = 1+step_cont
+                model.I *= coef # Update I for the next iteration
+                # model.I += step_cont  # Update I for the next iteration
                 #
                 solutions.append((model.I,model.alpha, y_0, T, mass[k],Rel_Err[k],k))
 
-                # model.I += step_cont  # Increment the Intensity for the next step
                 # model.I -= step_cont #Step back as we go down the branch
                 print(f"I  = {model.I:.3f}")
                 # Save intermediate results

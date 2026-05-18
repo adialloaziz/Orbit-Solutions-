@@ -1159,3 +1159,127 @@ def jacobian_optim(self, t, rho):
     
     # Combine components
     return np.asarray((J_linear.to_array() + flux_p_deriv - flux_m_deriv)) / h_sq
+
+
+class heat_equation:
+    def __init__(self, ficname):
+        self.ficname = ficname
+        self.read_params()
+        self.mesh1D = self.mesh_1D()  # Initialize the mesh
+        self.Lap = self.Lap_mat() #To avoid several call in the next functions
+    
+    def update_params(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Unknown parameter: {key}")
+        # Recompute dependent attributes if necessary
+        if any(key in kwargs for key in ['n_z', 'z_L', 'D']):
+            self.mesh1D = self.mesh_1D()  # Update the mesh if n_z or z_L changes
+            self.Lap = self.Lap_mat()  # Update the Laplacian matrix if n_z changes
+    def read_params(self): 
+        with open(self.ficname, 'r') as fic:
+            for line in fic:
+                line = line.strip()  # Remove leading/trailing spaces and newline
+                if not line or line.startswith("#"):  # Ignore empty lines and comments
+                    continue
+                parts = line.split('=')
+                if len(parts) != 2:
+                    print("#########################################")
+                    print("Error in parameter file (Invalid format)")
+                    print(line)
+                    sys.exit(1)
+
+                var, res = parts[0].strip().lower(), parts[1].strip()
+                try:
+                    if var == "n_z":
+                        self.n_z = int(res)
+
+                    elif var == "d": #Diffusion coefficient
+                        self.D = float(res)
+                    elif var == "t_ini":
+                        self.T_ini = float(res)
+                    elif var == "precision":
+                        self.precision = float(res)
+                    elif var == "z_l": #Length of the domain
+                        self.z_L = float(res)
+                    elif var == 'num_test':
+                        self.num_test = int(res)
+                    elif var == 'out_dir':
+                        self.out_dir = str(res)
+                    elif var == 'solver_steps':
+                        self.solver_steps = int(res)
+                    elif var == 'method':
+                        self.method = str(res)
+                    elif var == 'max_iter':
+                        self.max_iter = int(res)
+                    elif var == 'subsp_iter':
+                        self.subsp_iter = int(res)
+                    elif var == 'p0':
+                        self.p0 = int(res)
+                    elif var == 'pe':
+                        self.pe = int(res)
+                    elif var == 'rho':
+                        self.rho = float(res)
+                    elif var == 'picard_iter': #l: Maximum number of iteration for the Picard integration.
+                        self.picard_iter = int(res)
+                    elif var == 'full_sub_iter':
+                        self.full_sub_iter = bool(int(res))
+                    elif var == 'alpha': #Unfolding parameter
+                        self.alpha = float(res)
+                    elif var == 'm0': #Initial mass
+                        self.m0 = float(res)
+                    else:
+                        raise ValueError(f"Unknown parameter: {var}")
+                    
+                
+                except ValueError as e:
+                    print("#########################################")
+                    print("Error in parameter file")
+                    print(line)
+                    print(f"Exception: {e}")
+                    sys.exit(1)
+    
+    def mesh_1D(self):
+        "Create a uniform mesh in the interval [0, z_L] with n_z points"
+        h = self.z_L / (self.n_z - 1)
+        z = np.linspace(0, self.z_L, self.n_z)
+        return (z, h)
+    def Lap_mat(self):
+        "Laplacian Matrix"
+        _,h = self.mesh1D
+        main_diag = -2 * np.ones(self.n_z)
+        #Effect of the Neumann boundary conditions
+        main_diag[0] = -1
+        main_diag[-1] = -1
+        off_diag = np.ones(self.n_z - 1)
+        A = np.diag(main_diag) + np.diag(off_diag, k=1) + np.diag(off_diag, k=-1)
+        return A/(h*h)
+    def source_term(self,t,y):
+        # Periodic source term with mean zero
+        z,h=self.mesh1D
+        return np.cos(np.pi * t)*(np.cos(2*np.pi*z)) #np.cos(np.pi*y) #* np.ones_like(y)
+    def dydt(self, t, y):
+        # The heat equation dy/dt = Ay with A the Laplacian operator
+
+        return self.D * (self.Lap_mat() @ y) + self.source_term(t,y)
+    
+    def jacobian(self, t, y):
+        # Jacobian of the heat equation
+        return self.D * self.Lap_mat()
+    
+    def dydt_new(self,t,y):
+        #The modified heat equation with an artificial parameter beta
+        z,h=self.mesh1D
+        H = h*np.ones_like(y)
+        return self.dydt(t,y) + self.alpha*(H @ y - self.m0)*H
+    
+    def jacobian_new(self, t, y):
+        # Jacobian of the modified heat equation
+        _,h = self.mesh1D
+        J = self.jacobian(t, y)
+        H = h*np.ones_like(y)
+
+        return J + self.alpha * H@H.T  #np.diag(self.beta*(H@H)*np.ones(n),k=0)
+    
