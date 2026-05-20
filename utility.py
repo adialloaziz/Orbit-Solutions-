@@ -330,7 +330,7 @@ class orbit:
         
         return Delta_p_bar, Delta_T, B
 
-    def Newton_correction_mass_scal(self,unscaled_f, dr_dalpha, y, T, alpha, T_star, Vp, Wp, Delta_q_r, Delta_q_alpha, y_tild,H,m0):
+    def Newton_correction_mass_scal(self,unscaled_f, dr_dalpha, y, T, alpha, Vp, Wp, Delta_q_r, Delta_q_alpha, y_tild,H,m0):
         """
         Perform Newton correction for the orbit finding method with mass conservation.
         Args:
@@ -624,7 +624,7 @@ class orbit:
         I = np.eye(self.dim)
         H = h*np.ones_like(y_star)
         m0 = H @ y_0
-        T = 1.0
+        T_unit = 1.0
         unscaled_f = model.dydt 
         
     
@@ -639,21 +639,21 @@ class orbit:
             # phi_T = phi_t.y[:,-1]
 
             # monodromy = self.integ_monodromy2(M0=I, phi_t = phi_t, T=T)
-            phi_T, monodromy = self.integ_monodromy(y_star,I,T)
+            phi_T, monodromy = self.integ_monodromy(y_star,I,T_unit)
 
             #The orthogonality phase condition s =  0 is imposed
-            s = (y_star - y_0)@self.f(T,y_0) #unscaled_f(T,y_0)
-            ds_dT = (y_star - y_0)@(unscaled_f(T,y_star)) #+ alpha*H) #Derivative wrt T
+            s = (y_star - y_0)@self.f(T_unit,y_0) #unscaled_f(T,y_0)
+            ds_dT = (y_star - y_0)@(unscaled_f(T_unit,y_star)) #+ alpha*H) #Derivative wrt T
             #d = (y_star - y_prev)@self.f(T_star,y_prev)/T_star
 
-            ds_dy = self.f(T,y_0)#unscaled_f(T,y_0) #Derivative wrt y
+            ds_dy = self.f(T_unit,y_0)#unscaled_f(T,y_0) #Derivative wrt y
             ds_dalpha = (y_star - y_0 )@H#-T_star*(y_star - y_0)@(H) #Derivative wrt alpha
             #Periodicity condition r = phi_T - y_star
             dr_dy = (monodromy - I) #Derivative wrt y
-            dr_dT = unscaled_f(T,y_star) + alpha*H #self.f(T, y_star) #Derivative wrt T
+            dr_dT = unscaled_f(T_unit,y_star) + alpha*H #self.f(T, y_star) #Derivative wrt T
             #Derivative wrt alpha. Solving a variational equation wrt alpha
-            _, dr_dalpha = self.integ_sensitivity(y_star, S0=np.zeros(self.dim), T=T, f_param = H)
-            # dr_dalpha = self.integ_sensitivity2(S0=np.zeros(self.dim), phi_t = phi_t, T=T, f_param = H)
+            _, dr_dalpha = self.integ_sensitivity(y_star, S0=np.zeros(self.dim), T=T_unit, f_param = H)
+            # dr_dalpha = self.integ_sensitivity2(S0=np.zeros(self.dim), phi_t = phi_t, T=T_unit, f_param = H)
             
             #Mass conservation condition
             Delta_m = H @ (y_star) - m0
@@ -720,8 +720,15 @@ class orbit:
             elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
+                #Monodromy matrix at the last iteration
+                # self.f = model.dydt
+                # self.Jacf = model.jacobian
+                # _, monodromy = self.integ_monodromy(y_star,I,T_star)
+                _, monodromy = self.integ_monodromy(y_star,I,T_unit)
+            
+            
 
-        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy
     
     def Newton_mass_conserv4_unscal(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1):
         #h is the spatial step size
@@ -1103,7 +1110,7 @@ class orbit:
             Delta_p , Delta_T, Delta_alpha, B = self.Newton_correction_mass_scal(
                 unscaled_f = model.dydt,
                 dr_dalpha = dr_dalpha,
-                y = y_star,T = T_unit,T_star = T_star, alpha = alpha,Delta_q_alpha= Delta_q_alpha, Delta_q_r = Delta_q_r, Vp = Vp, Wp = Wp,
+                y = y_star,T = T_unit, alpha = alpha,Delta_q_alpha= Delta_q_alpha, Delta_q_r = Delta_q_r, Vp = Vp, Wp = Wp,
                 y_tild = y_0, H = H,m0=m0
             )
             Delta_q = Delta_q_r + Delta_alpha * Delta_q_alpha
@@ -1149,9 +1156,10 @@ class orbit:
             elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
+                _, monodromy = self.integ_monodromy(y_star,np.eye(self.dim),T_unit)#Attention à tenir en compte le cas ou alpha est grand. La perturbation n'est plus nulle.
         # Final monodromy matrix computation
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
-        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass,monodromy
 
     def NP_mass_conserv_sherman(self,model, y_0, T_0, alpha_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
         #h is the spatial step size

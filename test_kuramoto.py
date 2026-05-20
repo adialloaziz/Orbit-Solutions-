@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # model.alpha_shift = np.pi/3
     Ic = 2/np.cos(model.alpha_shift)
     # I_min = 1.5*Ic
-    I_max = 2.5*Ic
+    I_max = 4*Ic
     model.I = I_min
     # y_0 = (1/(2*np.pi))*np.ones_like(z_centers)+0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
     print(f"starting from I ={I_min:.3f}, T ={T:.3f}")
@@ -120,7 +120,7 @@ if __name__ == "__main__":
             print(f"Computing solution for Intensity I = {model.I} \nContinuation stepsize = {step_cont}")
             # k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,"Newton_mass_conserv4",
             #                                                                     model.p0,y_0=y_0,T=T, filename=None)
-            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,
+            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy = run(model,f, J, model.n_z,
                                                                                      "Newton_mass_conserv4",
                                                                                 model.p0, T=T, y_0=y_0,I_0=model.I,
                                                                                 alpha_0=model.alpha,step_cont=step_cont)
@@ -137,11 +137,10 @@ if __name__ == "__main__":
                 T = T_by_iter[k] # Update T for the next iteration
                 y_0 = y_by_iter[k]  # Update y_0 for the next iteration
                 # model.alpha  += step_cont*dalpha_deta  # Update alpha for the next iteration
+                solutions.append((model.I,model.alpha, y_0, T, mass[k],Rel_Err[k],k, monodromy))
                 coef = 1+step_cont
                 model.I *= coef # Update I for the next iteration
                 # model.I += step_cont  # Update I for the next iteration
-                #
-                solutions.append((model.I,model.alpha, y_0, T, mass[k],Rel_Err[k],k))
 
                 # model.I -= step_cont #Step back as we go down the branch
                 print(f"I  = {model.I:.3f}")
