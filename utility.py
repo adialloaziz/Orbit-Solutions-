@@ -44,21 +44,96 @@ def call_method(method, **kwargs):
 
     return method(**valid_args)
 
+def plot_eigenvalues(model, monodromy, intensity, T):
+    import matplotlib.pyplot as plt
+    model.I = intensity
+    eigenvalues, _ = np.linalg.eig(monodromy)
+    real_parts = np.real(eigenvalues)
+    imaginary_parts = np.imag(eigenvalues)
+
+    fig1, ax1 = plt.subplots(figsize=(8, 4))
+    # Plot the unit circle
+    theta = np.linspace(0, 2 * np.pi, 1000)
+    ax1.plot(np.cos(theta), np.sin(theta), 'k--', label='Unit Circle')
+
+    # Plot the eigenvalues
+    scatter = ax1.scatter([], [], color='r', label='Eigenvalues')
+    ax1.scatter(real_parts, imaginary_parts, color='r', label='Eigenvalues')
+    
+    ax1.set_xlabel(r'Re($\lambda$)')
+    ax1.set_ylabel(r'Im($\lambda$)')
+    ax1.set_title(f'I = {intensity: .3f}, T = {T:.3f}')
+    ax1.set_aspect('equal', 'box')
+    ax1.grid(True)
+    ax1.scatter([], [], color='r', label='Eigenvalues')
+    # ax1.legend(loc ="best")
+    return fig1, ax1, scatter
+def run(model,f, J,n_z,orbit_method,p0,T, y0, filename=None, integ_init=5):
+    epsilon = model.precision
+    model.n_z = n_z
+    model.p0 = p0 #Size of the dominant subspace
+    model.update_params()
+    #Initialization
+    _, _, h = model.mesh1D
+    
+    t_span = (0, integ_init*T)
+    H = h*np.ones_like(y0)
+    model.m0 = H @ y0
+    print('Mass at initial point:', model.m0)
+    #We integrate sufficiently the equation to find a good starting point
+    if integ_init:
+        phi_t = solve_ivp(f, t_span, y0, method='BDF', jac = J,
+                     rtol=1e-7, atol=1e-9,
+                     t_eval= [integ_init*T])
+    
+        y_T = phi_t.y[:,-1] #Using phi(y0,T0) as a starting point
+    else :
+        y_T = y0
+  
+    print('Mass at the starting point:', H@y_T)
+    orbit_finder = orbit(f,y0,T, J, solve_ivp, model.method, 10000,model.max_iter, epsilon)
+    
+    V_0 = np.eye(len(y0))[:,:p0+model.pe]#Initial guess of the subspace
+    #The arguments to pass to the orbit_finder method
+    args_func = {
+    "y_0": y_T,
+    "T_0": T,
+    "model": model,
+    "f_unscaled": f,
+    "jac_unscaled": J,
+    "alpha_0": model.alpha,
+    "Max_iter": model.max_iter,
+    "epsilon": epsilon,
+    "subsp_iter": model.subsp_iter,
+    "l": model.picard_iter,
+    "Ve_0": V_0,
+    "p0": p0,
+    "pe": model.pe,
+    "rho": model.rho,
+    "phase_cond": 2,
+    "l": model.picard_iter,
+    "full_sub_iter": model.full_sub_iter, # Use the full subspace iteration if True for the subspace iteration with projection
+    "h": h
+    }
+    method_to_call= getattr(orbit_finder, orbit_method)
+
+    return call_method(method_to_call, **args_func)
+
+
 class orbit:
-    def __init__(self, f,y_0,T_0, Jacf,phase_cond=2, ode_solver=solve_ivp,method="RK45",solver_steps=None, Max_iter=1, epsilon=1e-6):
+    def __init__(self, f,y_0,T_0, Jacf, ode_solver=solve_ivp,method="RK45",solver_steps=None, Max_iter=1, epsilon=1e-6):
         self.dim = np.shape(y_0)[0] #The problem dimension
         self.f = f 
         # self.y_0 = y_0
         # self.T_0 = T_0
 
         self.Jacf = Jacf
-        self.phase_cond = phase_cond
         self.ode_solver = ode_solver
         self.method = method
         self.solver_steps = solver_steps
         self.Max_iter = Max_iter
         self.epsilon = epsilon
-    # def read_params(self, filename):
+
     def big_system(self,t, Y_M):
         # Solving numerically the initial value problem (dy/dt,dM/dt = (f(t,y),Jacf*M) 
         M = Y_M[self.dim:].reshape((self.dim, self.dim), order = 'F')  # Reshape the flat array back into a dim x dim matrix
@@ -129,7 +204,6 @@ class orbit:
         S_T = sens_sol.y[:,-1] #We take S(T)
 
         return S_T
-    
     
    
     def monodromy_mult(self,y, T, v, method = 1, epsilon = 1e-6):
@@ -252,12 +326,7 @@ class orbit:
             #     break
         return Re, Ye, Ve, We, p
 
-    def base_Vp(self,v0, y_0, T, p, epsilon):
-        # dim = len(y_0)
-        Mv = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult(y_0, T, v, method = 2, epsilon = 1e-6))
-        
-        eigenval, Vp = eigs(Mv, k=p, which = 'LM', v0 = v0)#,maxiter=100)
-        return eigenval, Vp   
+       
     def picard_correction(self, y, T,r,phi_t, Vp,l):
         """
         Perform Picard correction for the orbit finding method.
@@ -457,10 +526,10 @@ class orbit:
 
         return Delta_p, Delta_T, Delta_alpha, B
 
-    def Newton_orbit(self,y_0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
+    def Newton_orbit(self,y_0,T_0, Max_iter, epsilon, h=1.0):
 
         #________________________________INITIALISATION_________________________________
-        y_star, y_prev, T_star = y_0.copy(), y_0.copy(), T_0
+        y_star, T_star = y_0.copy(), T_0
 
         y_by_iter, T_by_iter = np.zeros((Max_iter,self.dim)),np.zeros((Max_iter))
         Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
@@ -474,13 +543,6 @@ class orbit:
             phi_T, monodromy = self.integ_monodromy(y_star,I,T_star)
 
         #Selecting the phase-condition
-        # #To be taken out of the loop
-        #     if (phase_cond == 1 ): #Imposing a maximum or minimum on a component of y at t = 0 
-        #         d = 0
-        #         c = self.Jacf(T_star,y_star)[0,:] 
-        #         s = self.f(T_star,y_star)[0]
-        #     else:
-        #         if (phase_cond == 2) : #Orthogonality phase-condition
             d = 0
             c = self.f(T_star,y_0)
             s = (y_star - y_0)@self.f(T_star,y_0)
@@ -498,7 +560,6 @@ class orbit:
             Delta_T = XX[-1]
             
             #Updating
-            y_prev = y_star
             y_star += Delta_y
             T_star += Delta_T
 
@@ -532,8 +593,55 @@ class orbit:
                 print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+    def Newton_stationary_point(self,model,y_0, Max_iter, epsilon,h=1.0):
 
-    def Newton_orbit_scaled(self,model,y_0,T_0, Max_iter, epsilon,phase_cond = 2, h=1):
+        #________________________________INITIALISATION_________________________________
+        y_star = y_0.copy()
+
+        y_by_iter = np.zeros((Max_iter,self.dim))
+        Norm_B, Abs_Err = np.zeros((Max_iter)), np.zeros((Max_iter))
+        mass = np.zeros((Max_iter))
+        Rel_Err = np.zeros((Max_iter))
+
+        #______________________________Newton iteration loop________________
+        for k in range(Max_iter): # Stop criterion: norm_delta_y/norm_y0: To be kept in mind for small value of y 
+            
+            #Soving the whole system over one period
+            f_star = model.dydt(0,y_star)
+            J_star = model.jacobian(0,y_star)
+
+            Delta_y = solve(J_star,-f_star) 
+            
+            #Updating
+            y_star += Delta_y
+
+            Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
+            Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
+            Norm_B[k] = np.linalg.norm(f_star, ord=np.inf)
+            y_by_iter[k,:] = y_star
+
+            mass[k] = h*np.ones_like(y_star)@y_star 
+
+            print(f"_____________________Iteration {k}____________________________")  
+            print(f"Mass = {mass[k]}")       
+            print(f"$||err_abs(y)|| = {Abs_Err[k]:.3e}") 
+            print(f"$||err_rel(y)|| = {Rel_Err[k]:.3e} \n")
+            if Rel_Err[k] <= epsilon:
+                print(f"Precision reached within {k+1} iterations")
+                converged = 1
+                break
+            # Preventing explosion of the variables
+            elif Abs_Err[k] >= 1e2:
+                print("Abs_Err too large, stopping iteration: Divergence.")
+                converged = -1
+                break
+            elif k >= Max_iter-1:
+                converged = 0
+                print("Maximum number of iterations reached.")
+
+        return k, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
+
+    def Newton_orbit_scaled(self,model,y_0,T_0, Max_iter, epsilon, h=1.0):
 
         #________________________________INITIALISATION_________________________________
         y_star, y_prev, T_star = y_0.copy(), y_0.copy(), T_0
@@ -611,8 +719,8 @@ class orbit:
                 print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
-    
-    def Newton_mass_conserv4(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1):
+      
+    def Newton_mass_conserv4(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1.0):
         #h is the spatial step size
         #________________________________INITIALISATION_________________________________
         y_star, T_star = y_0.copy(), T_0
@@ -730,7 +838,7 @@ class orbit:
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy
     
-    def Newton_mass_conserv4_unscal(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1):
+    def Newton_mass_conserv4_unscal(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1.0):
         #h is the spatial step size
         #________________________________INITIALISATION_________________________________
         y_star, T_star = y_0.copy(), T_0
@@ -1315,7 +1423,7 @@ class orbit:
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
 
-    def Newton_mass_cont_correct(self,model,y_0,T_0,alpha_0,I_0,step_cont,tangent_dir, Max_iter, epsilon,h=1):
+    def Newton_mass_cont_correct(self,model,y_0,T_0,alpha_0,I_0,step_cont,tangent_dir, Max_iter, epsilon,h=1.0):
         #Handling continuation in the interaction strength model.I
         #  
         #________________________________INITIALISATION_________________________________
@@ -1456,3 +1564,4 @@ class orbit:
                 print("Maximum number of iterations reached.")
 
         return k, T_by_iter, y_by_iter, I_by_iter, alpha_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, XX_tangent
+    

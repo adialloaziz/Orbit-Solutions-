@@ -927,6 +927,13 @@ def subsp_iter_projec2(
         #     break
     return Re, Ye, Ve, We, p
 
+def base_Vp(self,v0, y_0, T, p, epsilon):
+        # dim = len(y_0)
+        Mv = LinearOperator((self.dim,self.dim),matvec = lambda v : self.monodromy_mult(y_0, T, v, method = 2, epsilon = 1e-6))
+        
+        eigenval, Vp = eigs(Mv, k=p, which = 'LM', v0 = v0)#,maxiter=100)
+        return eigenval, Vp
+
 def subspace_iter(self,
                     y,Ve_ini, T, phi_t, p0, pe, max_iter):
     Ve = Ve_ini.copy()

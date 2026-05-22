@@ -748,10 +748,9 @@ class Kuramoto:
     def stationary_eq(self, rho):
         _,z_centers, h = self.mesh1D
         #Convolution of W and rho
-        V = h*sp.signal.convolve(self.kuramoto_potential(z_centers), rho, mode='same', method='fft')
 
-        normalizer = sp.integrate.trapezoid(np.exp(-self.I*V), z_centers)
-        return np.exp(-self.I*V)/normalizer
+        normalizer = sp.integrate.trapezoid(np.exp(-self.V_kuramoto(z_centers-z_centers[0], rho)), z_centers)
+        return np.exp(-self.V_kuramoto(z_centers-z_centers[0], rho))/normalizer
 
 
     def dydt_new(self,t, rho):

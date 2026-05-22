@@ -12,7 +12,7 @@ alpha_shift=0
 alpha=0.0
 beta=-1
 precision=1e-9
-out_dir=./Results/kuramoto/
+out_dir=./Results/kuramoto_param.in/
 Max_iter=40
 method=RK45
 #PARMETERS FOR NEWTON-PICARD Method
