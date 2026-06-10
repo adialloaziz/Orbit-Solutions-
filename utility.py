@@ -832,10 +832,9 @@ class orbit:
                 # self.f = model.dydt
                 # self.Jacf = model.jacobian
                 # _, monodromy = self.integ_monodromy(y_star,I,T_star)
-                _, monodromy = self.integ_monodromy(y_star,I,T_unit)
+        
+        _, monodromy = self.integ_monodromy(y_star,I,T_unit)
             
-            
-
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy
     
     def Newton_mass_conserv4_unscal(self,model,y_0,T_0,alpha_0, Max_iter, epsilon,h=1.0):
@@ -1264,7 +1263,8 @@ class orbit:
             elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
-                _, monodromy = self.integ_monodromy(y_star,np.eye(self.dim),T_unit)#Attention à tenir en compte le cas ou alpha est grand. La perturbation n'est plus nulle.
+            
+        _, monodromy = self.integ_monodromy(y_star,np.eye(self.dim),T_unit)#Attention à tenir en compte le cas ou alpha est grand. La perturbation n'est plus nulle.
         # Final monodromy matrix computation
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass,monodromy

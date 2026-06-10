@@ -40,13 +40,13 @@ cat > jobs/branch_kuramoto/job_branch_kuramoto.sh <<EOF
 #PBS -S /bin/bash
 #PBS -N branch_kuramoto
 #PBS -M diallo
-#PBS -l nodes=u-0-5:ppn=8 #Picking all the CPUs to avoid competition on nodes for the jobs
+#PBS -l nodes=u-0-1:ppn=8 #Picking all the CPUs to avoid competition on nodes for the jobs
 ##PBS -l host=u-0-[0-9]
 
 #PBS -l walltime=60:00:00
 ##PBS -t 0-3 #To subimit the job as an array job, uncomment this line.
 #PBS -m bea
-#PBS -o logs/branch_kuramoto/branch_kuramto.out
+#PBS -o logs/branch_kuramoto/branch_kuramoto.out
 #PBS -e logs/branch_kuramoto/branch_kuramoto.err
 #PBS -V
 #PBS -q pmedium

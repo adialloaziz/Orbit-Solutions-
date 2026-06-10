@@ -33,14 +33,14 @@ else
     source $DIR/.myvenv/bin/activate
     #conda activate $DIR/.myvenv
 fi
-denoms=(4)
+denoms=(3 4 5 6)
 for denom in "${denoms[@]}"; do
     cat > jobs/branch_kuramoto/job_branch_kuramoto_alpha_pi_over_${denom}.sh <<EOF
 #!/bin/bash 
 #PBS -S /bin/bash
 #PBS -N branch_kuramoto_alpha_pi_over_${denom}
 #PBS -M diallo
-#PBS -l nodes=u-0-5:ppn=8 #Picking all the CPUs to avoid competition on nodes for the jobs
+#PBS -l nodes=u-0-1:ppn=8 #Picking all the CPUs to avoid competition on nodes for the jobs
 ##PBS -l host=u-0-[0-9]
 
 #PBS -l walltime=60:00:00

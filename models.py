@@ -587,6 +587,8 @@ class Kuramoto:
                         self.beta = float(res)
                     elif var == 'alpha_shift': #Shift parameter for the Kuramoto potential
                         self.alpha_shift = float(res)
+                    elif var == 'alpha_shift_2': #Shift parameter for the second harmonic in the Kuramoto potential
+                        self.alpha_shift_2 = float(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                     
@@ -600,7 +602,7 @@ class Kuramoto:
     def mesh_1D(self):
         "Create a uniform mesh in the interval [xmin, xmax] with n_z points"
         h = (self.xmax - self.xmin) / (self.n_z - 1)
-        x = np.linspace(self.xmin, self.xmax, self.n_z, endpoint=True)
+        x = np.linspace(self.xmin, self.xmax, self.n_z, endpoint=True,retstep=False)
         # Centers of the mesh cells
         x_centers = x[:-1] + h/2
         return (x, x_centers, h)
@@ -615,7 +617,7 @@ class Kuramoto:
     
     def kuramoto_potential(self, z):
 
-        return -np.cos(z - self.alpha_shift)
+        return -np.cos(z - self.alpha_shift) - 0.5*np.cos(2*(z -self.alpha_shift_2))
     
     def Conv_mat_per(self):
         "The convolution matrix for the Kuramoto potential with periodic BCs"
