@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 import pickle
 import numpy as np
-from utility import orbit,call_method
-from models import Kuramoto
+from scripts.utility import orbit,call_method
+from scripts.models import Kuramoto
 import datetime, time
 from scipy.integrate import solve_ivp
 
@@ -153,7 +153,13 @@ if __name__ == "__main__":
     args = prog_options(model)
     
     model.alpha_shift = np.pi / args.denom
+    model.alpha_shift_2 = np.pi
+    model.n_z = args.n_z
+    Ic = 2/np.cos(model.alpha_shift)
+    model.I = 2.0 * Ic
 
+    model.max_iter = 10
+    model.update_params()
     f = model.dydt
     J = model.jacobian
 
@@ -161,13 +167,7 @@ if __name__ == "__main__":
     
 
     # Initial condition
-    model.alpha_shift = np.pi/args.denom
-    model.alpha_shift_2 = np.pi
-    Ic = 2/np.cos(model.alpha_shift)
-    model.I = 2.0 * Ic
-
-    model.max_iter = 10
-    model.update_params()
+    
     T = model.T_ini
     print(f"starting from I ={model.I:.3f}, T ={T:.3f}")
     y0 = (1/(2*np.pi))*np.ones_like(z_centers) + 0.01*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
