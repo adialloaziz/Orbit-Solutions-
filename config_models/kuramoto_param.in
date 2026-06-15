@@ -6,7 +6,7 @@ xmax=3.141592653589793
 scal=1 
 n_z=100
 m0=30.0
-T_ini=3.03
+T_ini=2.1
 #kuramoto potential
 alpha_shift=0.0
 alpha_shift_2=0.0

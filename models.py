@@ -617,7 +617,7 @@ class Kuramoto:
     
     def kuramoto_potential(self, z):
 
-        return -np.cos(z - self.alpha_shift) - 0.5*np.cos(2*(z -self.alpha_shift_2))
+        return -np.cos(z - self.alpha_shift) - 2.0*np.cos(2*z -self.alpha_shift_2)
     
     def Conv_mat_per(self):
         "The convolution matrix for the Kuramoto potential with periodic BCs"

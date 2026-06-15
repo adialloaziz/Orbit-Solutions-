@@ -46,7 +46,7 @@ def prog_options(model):
                       )
     parser.add_argument(
                     "-denom", "--denom", type=int, default = 3,
-                    help="""The value of the phase shift alpha in the Kuramoto model. Default is 0.0 """
+                    help="""The value of the phase shift alpha in the Kuramoto model. Default is 3, which corresponds to alpha = pi/3."""
                       )
     args = parser.parse_args()
     return args
