@@ -589,6 +589,8 @@ class Kuramoto:
                         self.alpha_shift = float(res)
                     elif var == 'alpha_shift_2': #Shift parameter for the second harmonic in the Kuramoto potential
                         self.alpha_shift_2 = float(res)
+                    elif var == 'nu': #Amplitude of the second mode in the interaction potential
+                        self.nu = float(res)
                     else:
                         raise ValueError(f"Unknown parameter: {var}")
                     
@@ -617,7 +619,8 @@ class Kuramoto:
     
     def kuramoto_potential(self, z):
 
-        return -np.cos(z - self.alpha_shift) - 2.0*np.cos(2*z -self.alpha_shift_2)
+        return -np.cos(z) + self.nu*np.cos(2*(z -self.alpha_shift))
+    
     
     def Conv_mat_per(self):
         "The convolution matrix for the Kuramoto potential with periodic BCs"

@@ -2,12 +2,12 @@ import argparse
 from pathlib import Path
 import pickle
 import numpy as np
-from scripts.utility import orbit,call_method
-from scripts.models import Kuramoto
+from utility import orbit, call_method
+from models import Kuramoto
 import datetime
 from scipy.integrate import solve_ivp
 
-def prog_options(model):
+def prog_options():
     #_____Handling command line arguments_____
 
     parser = argparse.ArgumentParser(
@@ -26,7 +26,7 @@ def prog_options(model):
         " Defaut: save."
                         )
     parser.add_argument(
-                    "-n_z","--n_z", type=int, default = model.n_z,
+                    "-n_z","--n_z", type=int, default = 100,
                     help="""The gird size n_z over which the method will be tested.
                             Default is provided in the parameter file of the model."""
                       )
@@ -51,12 +51,12 @@ def prog_options(model):
     args = parser.parse_args()
     return args
 
-def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_dir=None, filename=None):
+def run(model,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_dir=None, filename=None):
 
     epsilon = model.precision
     model.n_z = n_z
     model.p0 = p0 #Size of the dominant subspace
-    model.update_params()#**{'n_z': n_z}) #Update the model parameters
+    model.update_params() #Update the model parameters
     
     _, _, h = model.mesh1D
     
@@ -64,7 +64,7 @@ def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_di
 
     model.m0 = H @ y_0
     
-    orbit_finder = orbit(f,y_0,T, J, solve_ivp, model.method, 10000,model.max_iter, epsilon)
+    orbit_finder = orbit(model.dydt,y_0,T, model.jacobian, solve_ivp, model.method, 10000,model.max_iter, epsilon)
     
     V_0 = np.eye(len(y_0))[:,:p0+model.pe]#Initial guess of the subspace
     #The arguments to pass to the orbit_finder method
@@ -75,8 +75,8 @@ def run(model,f, J,n_z,orbit_method,p0,T, y_0,I_0,alpha_0, step_cont, tangent_di
     "step_cont": step_cont,
     "tangent_dir": tangent_dir,
     "model": model,
-    "f_unscaled": f,
-    "jac_unscaled": J,
+    "f_unscaled": model.dydt,
+    "jac_unscaled": model.jacobian,
     "alpha_0": alpha_0,
     "Max_iter": model.max_iter,
     "epsilon": epsilon,
@@ -101,18 +101,19 @@ if __name__ == "__main__":
     today = datetime.date.today().strftime("%Y-%m-%d")
 
     BASE_PATH = Path().parent.resolve()
-
-    param_file_dir = BASE_PATH/"config_models/kuramoto_param.in"
-    param_file_name = "kuramoto_param.in"# file containing model parameters
+    args = prog_options()
+    param_file_name = args.param_file
+    param_file_dir = BASE_PATH/f"config_models/{param_file_name}"
+     # "kuramoto_param.in"# file containing model parameters
     model = Kuramoto(param_file_dir)
     print("Loaded parameters of the Kuramoto model with a phase discretization of:", model.n_z)
     #_____Handling command line arguments_____
-    args = prog_options(model)
     
     model.alpha_shift = np.pi / args.denom
-
-    f = model.dydt
-    J = model.jacobian
+    Ic = 2/np.cos(model.alpha_shift)
+    model.I = 2.0 * Ic
+   
+    model.update_params()
 
     _, z_centers, h = model.mesh1D  # Get the mesh and centers
     
@@ -126,14 +127,10 @@ if __name__ == "__main__":
     # model.alpha_shift = data['alpha_shift']
     # I_max = data['I']
     coeff = "2*I_c"
-    Ic = 2/np.cos(model.alpha_shift)
-    model.I = 2.0 * Ic
-    model.alpha_shift_2 = np.pi
-    T = 2.1
-    model.update_params()
-    y_0 = (1/(2*np.pi))*np.ones_like(z_centers)+ 0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
-
-    sol = solve_ivp(f, (0, 6*T), y_0, method='BDF', jac = J,
+    T = model.T_ini
+    
+    y_0 = np.full(len(z_centers), 1/(2*np.pi)) + 0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
+    sol = solve_ivp(model.dydt, (0, 6*T), y_0, method='BDF', jac = model.jacobian,
                         rtol=1e-7, atol=1e-9,
                         t_eval=[6*T])
     y_0 = sol.y[:,-1] #Using phi(y0,T0) as a starting point
@@ -143,8 +140,6 @@ if __name__ == "__main__":
     print(f"starting from I ={model.I:.3f}, T ={T:.3f}")
     H = h*np.ones_like(y_0)
     model.m0 = float(H @ y_0)
-
-    
 
     print('Mass at the starting point:', H@y_0)
 
@@ -159,8 +154,8 @@ if __name__ == "__main__":
     results_dir.mkdir(parents=True, exist_ok=True)
     # results_dir = Path(results_dir)
     print("Results will be saved in:", results_dir)
-    file = results_dir / f"branch_solutions_{today}_alpha_pi_over_{args.denom}.txt"
-    file_pkl = results_dir / f"branch_solutions_{today}_alpha_pi_over_{args.denom}.pkl"
+    file = results_dir / f"two_mod_branch_solutions_{today}_alpha_pi_over_{args.denom}.txt"
+    file_pkl = results_dir / f"two_mod_branch_solutions_{today}_alpha_pi_over_{args.denom}.pkl"
 
     with open(file, "w") as fic:
         fic.write("I_value\tTstar\tystar\n")
@@ -169,12 +164,19 @@ if __name__ == "__main__":
             print(f"Computing solution for Intensity I = {model.I} \nContinuation stepsize = {step_cont}")
             # k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass = run(model,f, J, model.n_z,"Newton_mass_conserv4",
             #                                                                     model.p0,y_0=y_0,T=T, filename=None)
-            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy = run(model,f, J, model.n_z,
-                                                                                     "Newton_mass_conserv4",
+            k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy = run(model, model.n_z,
+                                                                                     args.method,
                                                                                 model.p0, T=T, y_0=y_0,I_0=model.I,
                                                                                 alpha_0=model.alpha,step_cont=step_cont)
             if converged == -1:
                 print("Branch continuation stopped due to divergence.")
+                step_cont /= 2  # Reduce the continuation step
+                model.I -= step_cont  # Step back
+                # model.I += step_cont
+                continue  # Retry with a smaller step
+            elif ((converged == 0) and (Rel_Err[k] > 1e-5)):
+                print("Maximum number of iteration reached with a non sufficient precision")
+                print("Retrying with smaller step.....")
                 step_cont /= 2  # Reduce the continuation step
                 model.I -= step_cont  # Step back
                 # model.I += step_cont
@@ -199,7 +201,7 @@ if __name__ == "__main__":
                 # if not ((model.I <= I_max) and (step_cont > 1e-4)):
                 if not ((model.I >= I_min) and (step_cont > 1e-4)):
                     print("Reached the end of the branch or minimum step size. Stopping continuation.")
-	    
+    
                 # Save after each successful computation
                 with open(file_pkl, "wb") as f_pkl:
                     pickle.dump(solutions, f_pkl)

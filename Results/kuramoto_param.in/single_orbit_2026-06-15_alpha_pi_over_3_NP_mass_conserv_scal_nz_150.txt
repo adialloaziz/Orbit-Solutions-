@@ -1,3 +1,3 @@
-100,OK
+150,OK
 
-{'orbit_method': 'NP_mass_conserv_scal', 'solv_method': 'RK45', 'nz': 100, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': True, 'rho': 0.5, 'n_iter': 6, 'abs_err': np.float64(3.180434648949656e-11), 'rel_err': np.float64(9.682671332861964e-11), 'norm_B': np.float64(5.273768868213582e-10), 'converged': 1, 'comput_time': 679.5044929981232, 'T_star': np.float64(2.0785309845613034), 'mass_star': np.float64(0.9999999999999994)}
+{'orbit_method': 'NP_mass_conserv_scal', 'solv_method': 'RK45', 'nz': 150, 'p0': 5, 'pe': 4, 'sub_sp_iter': 5, 'full_sub_iter': True, 'rho': 0.5, 'n_iter': 7, 'abs_err': np.float64(7.741888282350556e-12), 'rel_err': np.float64(2.357099765797423e-11), 'norm_B': np.float64(1.576561143933088e-10), 'converged': 1, 'comput_time': 7165.640037059784, 'T_star': np.float64(2.0776268764506685), 'mass_star': np.float64(1.0)}
