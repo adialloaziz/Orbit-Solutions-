@@ -111,7 +111,7 @@ if __name__ == "__main__":
     
     model.alpha_shift = np.pi / args.denom
     Ic = 2/np.cos(model.alpha_shift)
-    model.I = 2.0 * Ic
+    model.I = 1.005 * Ic
    
     model.update_params()
 
@@ -126,17 +126,17 @@ if __name__ == "__main__":
     # T = data['T']
     # model.alpha_shift = data['alpha_shift']
     # I_max = data['I']
-    coeff = "2*I_c"
-    T = model.T_ini
+    coeff = "1.005*I_c"
+    T = 2*np.pi/np.tan(model.alpha_shift) #Initial guess for the period of the orbit
     
     y_0 = np.full(len(z_centers), 1/(2*np.pi)) + 0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
-    sol = solve_ivp(model.dydt, (0, 6*T), y_0, method='BDF', jac = model.jacobian,
+    sol = solve_ivp(model.dydt, (0, 3*T), y_0, method='BDF', jac = model.jacobian,
                         rtol=1e-7, atol=1e-9,
-                        t_eval=[6*T])
+                        t_eval=[3*T])
     y_0 = sol.y[:,-1] #Using phi(y0,T0) as a starting point
 
-    I_min = 2.0*Ic
-    I_max = 2.2*Ic
+    I_min = 1.001*Ic
+    I_max = 8*Ic
     print(f"starting from I ={model.I:.3f}, T ={T:.3f}")
     H = h*np.ones_like(y_0)
     model.m0 = float(H @ y_0)
@@ -154,9 +154,9 @@ if __name__ == "__main__":
     results_dir.mkdir(parents=True, exist_ok=True)
     # results_dir = Path(results_dir)
     print("Results will be saved in:", results_dir)
-    file = results_dir / f"two_mod_branch_solutions_{today}_alpha_pi_over_{args.denom}.txt"
-    file_pkl = results_dir / f"two_mod_branch_solutions_{today}_alpha_pi_over_{args.denom}.pkl"
-
+    file = results_dir / f"two_mod_branch_sol_{today}_fwrd_1.txt"
+    file_pkl = results_dir / f"two_mod_branch_sol_{today}_fwrd_1.pkl"
+    
     with open(file, "w") as fic:
         fic.write("I_value\tTstar\tystar\n")
         while ((model.I <= I_max) and (step_cont > 1e-4)):
@@ -174,7 +174,7 @@ if __name__ == "__main__":
                 model.I -= step_cont  # Step back
                 # model.I += step_cont
                 continue  # Retry with a smaller step
-            elif ((converged == 0) and (Rel_Err[k] > 1e-5)):
+            elif ((converged == 0) and (Rel_Err[k] > 1e-4)):
                 print("Maximum number of iteration reached with a non sufficient precision")
                 print("Retrying with smaller step.....")
                 step_cont /= 2  # Reduce the continuation step

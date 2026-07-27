@@ -619,7 +619,7 @@ class Kuramoto:
     
     def kuramoto_potential(self, z):
 
-        return -np.cos(z) + self.nu*np.cos(2*(z -self.alpha_shift))
+        return -np.cos(z-self.alpha_shift) - self.nu*np.cos(2*(z -self.alpha_shift_2))
     
     
     def Conv_mat_per(self):
