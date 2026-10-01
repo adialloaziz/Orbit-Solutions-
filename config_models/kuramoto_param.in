@@ -10,10 +10,10 @@ T_ini=3.6
 #kuramoto potential
 alpha_shift=0.0
 alpha_shift_2=0.0
-nu=0.2
+nu=0.25
 alpha=0.0
 beta=-1
-precision=1e-9
+precision=1e-8
 out_dir=./Results/kuramoto_param.in/
 Max_iter=40
 method=RK45

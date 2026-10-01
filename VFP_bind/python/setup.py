@@ -4,9 +4,9 @@ from setuptools import setup
 ext_modules = [
     Pybind11Extension(
         "module_vfp",
-        ["./module_vfp.cpp",
-         "../src/VFP.cpp",
-         "../src/utility.cpp"],
+        ["/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/python/module_vfp.cpp",
+         "/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/src/VFP.cpp",
+         "/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/src/utility.cpp"],
 
          extra_compile_args=[
              "-std=c++17",

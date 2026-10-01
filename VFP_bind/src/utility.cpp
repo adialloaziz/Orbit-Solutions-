@@ -83,7 +83,7 @@ void vlasov(double dt, double * U0, double * U1, int nq, int np, double dq, doub
 	      x = (MZij[0]- q[k])/dq;
 	      y = (MZij[1]- p[l])/dp;
 	      int i11=(k-1)*np+(l-1);
-	      int i12=(k-1)*np+l;
+	      int i12=(k-1)*np+l;  
 	      int i13=(k-1)*np+(l+1);
 	      int i21=k*np+(l-1);
 	      int i22=k*np+l;

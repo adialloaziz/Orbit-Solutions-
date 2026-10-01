@@ -110,8 +110,9 @@ if __name__ == "__main__":
     #_____Handling command line arguments_____
     
     model.alpha_shift = np.pi / args.denom
+    model.alpha_shift_2 = np.pi/8
     Ic = 2/np.cos(model.alpha_shift)
-    model.I = 1.005 * Ic
+    model.I = 1.001 * Ic
    
     model.update_params()
 
@@ -126,17 +127,17 @@ if __name__ == "__main__":
     # T = data['T']
     # model.alpha_shift = data['alpha_shift']
     # I_max = data['I']
-    coeff = "1.005*I_c"
+    coeff = "1.001*I_c"
     T = 2*np.pi/np.tan(model.alpha_shift) #Initial guess for the period of the orbit
     
-    y_0 = np.full(len(z_centers), 1/(2*np.pi)) + 0.001*np.sin(2*np.pi*z_centers/(model.xmax - model.xmin))
+    y_0 = np.full(len(z_centers), 1/(2*np.pi)) + 1e-1*np.cos(z_centers)
     sol = solve_ivp(model.dydt, (0, 3*T), y_0, method='BDF', jac = model.jacobian,
                         rtol=1e-7, atol=1e-9,
                         t_eval=[3*T])
     y_0 = sol.y[:,-1] #Using phi(y0,T0) as a starting point
 
-    I_min = 1.001*Ic
-    I_max = 8*Ic
+    I_min = (1.0+1e-3)*Ic
+    I_max = 1.2*Ic
     print(f"starting from I ={model.I:.3f}, T ={T:.3f}")
     H = h*np.ones_like(y_0)
     model.m0 = float(H @ y_0)
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     # A loop to compute the branch of solutions wrt the Intensity I
     
     # tangent_dir = np.concatenate((1e-4*np.ones_like(y_0), [1.e-4], [1e-4],[1e-4])) #Initial tangent direction for the continuation (dy/deta, dT/deta, dI/deta, dalpha/deta)
-    step_cont = 0.1
+    step_cont = 1.25e-3
 
     solutions = []
 
@@ -191,7 +192,8 @@ if __name__ == "__main__":
                 solutions.append((model.I,model.alpha, y_0, T, mass[k],Rel_Err[k],k, monodromy))
                 # coef = 1-step_cont
                 # model.I -= step_cont*Ic # Update I for the next iteration
-                model.I += step_cont*Ic  # Update I for the next iteration
+                if (model.I - I_min):
+                    model.I += step_cont*Ic  # Update I for the next iteration
 
                 print(f"I  = {model.I:.3f}")
                 # Save intermediate results

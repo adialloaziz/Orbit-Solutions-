@@ -832,8 +832,8 @@ class orbit:
                 # self.f = model.dydt
                 # self.Jacf = model.jacobian
                 # _, monodromy = self.integ_monodromy(y_star,I,T_star)
-        
-        _, monodromy = self.integ_monodromy(y_star,I,T_unit)
+        if (converged) == 1: #Computing the monodromy matrix only if the Newton iteration converged
+            _, monodromy = self.integ_monodromy(y_star,I,T_unit)
             
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass, monodromy
     
@@ -938,6 +938,9 @@ class orbit:
             elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
+
+        if (converged) == 1: #Computing the monodromy matrix only if the Newton iteration converged
+            _, monodromy = self.integ_monodromy(y_star,I,T_star)
 
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass
     

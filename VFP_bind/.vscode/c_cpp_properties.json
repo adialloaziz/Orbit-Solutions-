@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/include",
+                "/usr/include",
+                "/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/.venv/include",
+                "/usr/include/"
+                // "/home/diallo/Nextcloud/PhD/code/Orbit-Solutions-/VFP_bind/.venv/lib/python3.13/site-packages/pybind11/include"
+            ],
+            "defines": [
+                "VERSION=4"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "recursiveIncludes": {
+                "reduce": "always"
+            }
+        }
+    ],
+    "version": 4
+}

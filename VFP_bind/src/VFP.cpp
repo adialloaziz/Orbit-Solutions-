@@ -14,6 +14,7 @@ void integ_vfp(double t1, double t2){
   
   
   //----------parameters---------------
+  //Faire une classe pour le maillage et les params à lire dans un fichier
   //___ spatial mesh___
   double Lq=20; //unit of sigma_z
   double Lp=20; //unit of sigma_E
@@ -32,7 +33,7 @@ void integ_vfp(double t1, double t2){
   
   int neqn = nq*np;
   
-  //___temporal par. ___
+  //___temporal par.___
   int nt=8000;
   int ntint=10;
   // double t1=0;
@@ -182,7 +183,7 @@ void integ_vfp(double t1, double t2){
 
 
 }
-
+// Faire un return de la densite
 
 // int main(int argc, char * argv[])
 // {
