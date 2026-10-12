@@ -3,6 +3,7 @@
 
 #pragma once
 #include <complex>
+#include <vector>
 #include <gsl/gsl_poly.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
@@ -19,7 +20,7 @@ struct Params {
 void free_space_and_parallel_plates_integ_part(double * g,  double * convol, complex<double>* impedance, fftw_plan pfor, fftw_plan pback, int nq,     complex<double> * tf_g,  complex<double> *tmp_tf);
 //1) tab "free_space_and_parallel_plates_integ_part_fftfactor" (calculated by init_WF.cpp)
 
-void init_vfp(double *U0, int nq, int np, 
+std::vector<double> init_vfp(int nq, int np, 
               double Lq, double Lp, double rms_gauss_q,
                double rms_gauss_p);
 

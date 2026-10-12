@@ -16,6 +16,8 @@ struct VfpResults {
     std::vector<double> mass; 
 };
 
-VfpResults integ_vfp(double t1, double t2, int nt, int ntint);
+VfpResults integ_vfp(double *U0, double t1,
+                    double t2, int nt, int ntint,
+                    int nq, int np, double Lq, double Lp, double grand_L);
 
 #endif //VFP_H

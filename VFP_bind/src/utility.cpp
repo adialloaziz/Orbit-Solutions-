@@ -2,22 +2,22 @@
 #include <cmath>
 
 
-void init_vfp(double *U0, int nq, int np, 
+std::vector<double> init_vfp(int nq, int np, 
               double Lq, double Lp, double rms_gauss_q,
                double rms_gauss_p)
 {
   double dq = Lq/double(nq);
   double dp = Lp/double(np);
-    
-  double* q = new double[nq];
-  double* p = new double [np];
+
+  std::vector<double> q(nq);
+  std::vector<double> p(np);
   for (int i=0; i<nq; i++){q[i]=-Lq/2. + double(i)*dq;}
   for (int i=0; i<np; i++){p[i]=-Lp/2. + double(i)*dp;}
   
   //____initial condition: gauss - to do: from input argument____
   // double rms_gauss_q = 1.2;
   // double rms_gauss_p = 1.2;
-
+  std::vector<double> U0(nq*np);
   for (int iq=0; iq<nq; iq++)
     {
       double q1 =q[iq];
@@ -27,6 +27,7 @@ void init_vfp(double *U0, int nq, int np,
     U0[iq*np+ip] = (1./(2.*rms_gauss_q*rms_gauss_p*M_PI))*exp(-(q1*q1)/(2.*rms_gauss_q*rms_gauss_q))*exp(-(p1*p1)/(2.*rms_gauss_p*rms_gauss_p));
   }
     }
+  return U0;
 }
 
 void force_co_from_projection_plus_shot_noise(double * U, double dt, double t, int grand_n, int nq, int np, double* density, double*  wf_free_space_and_parallel_plate_integ_part,  complex<double>* impedance_final, fftw_plan pfor, fftw_plan pback,  complex<double> *  tf_g,  complex<double> *  tmp_tf, double I, double* force )
