@@ -10,7 +10,8 @@ ext_modules = [
 
          extra_compile_args=[
              "-std=c++17",
-             "-O3",
+             "-O0",
+             "-g",
              ],
         libraries=["gsl", "gslcblas", "fftw3", "m"],
 

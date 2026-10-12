@@ -19,6 +19,10 @@ struct Params {
 void free_space_and_parallel_plates_integ_part(double * g,  double * convol, complex<double>* impedance, fftw_plan pfor, fftw_plan pback, int nq,     complex<double> * tf_g,  complex<double> *tmp_tf);
 //1) tab "free_space_and_parallel_plates_integ_part_fftfactor" (calculated by init_WF.cpp)
 
+void init_vfp(double *U0, int nq, int np, 
+              double Lq, double Lp, double rms_gauss_q,
+               double rms_gauss_p);
+
 void force_co_from_projection_plus_shot_noise(double * U, double dt, double t, int grand_n, int nq, int np, double* density, double*  wf_free_space_and_parallel_plate_integ_part,  complex<double>* impedance_final, fftw_plan pfor, fftw_plan pback,  complex<double> *  tf_g,  complex<double> *  tmp_tf, double I, double* force );
 void vlasov(double dt, double * U0, double * U1, int nq, int np, double dq, double dp, double* q, double* p, double* force);
 void fokker_planck_finite_diff_MPI(double dt, double * U0, double * U1, double dp, int nq, int np, double epsilon, double* p);

@@ -35,7 +35,7 @@ int main(int argc, char * argv[])
   
   //_____________mesh & wakefield par.  (n=grand_n; L=grand_L) ____________
   double Lq=20; //unit of sigma_z
-  int    nq=480;
+  int    nq=80;   //480;
   double grand_L=40;
   int grand_n = nq*grand_L/Lq;
   int super_n=100*grand_n;

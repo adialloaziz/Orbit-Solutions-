@@ -1,0 +1,28 @@
+#----------parameters---------------
+#Faire une classe pour le maillage et les params à lire dans un fichier
+#___ spatial mesh___
+Lq=20 #unit of sigma_z
+Lp=20 #unit of sigma_E
+grand_L=40
+nq= 80
+np= 80
+
+#___temporal par.___
+nt=800
+ntint=10
+
+#___ electron par. ___
+_e=1.602e-19 #C
+E0=2.75e9 #eV
+energy_spread=1.017e-3 #normalized by E0
+I=0.44e-3 #A (ou 0.44 ?)
+fs=1467 #sync. fq. s-1
+omega_s=2.*M_PI*fs 
+td=3.27e-3 #s
+T0=1.181e-6 #s
+
+sigma_e = energy_spread * E0*_e #C
+sigma_z = 1.45e-3 #unit ?
+gamma = E0/0.511e6 
+epsilon = 1./(omega_s*td)
+Nelectrons=I*T0/_e

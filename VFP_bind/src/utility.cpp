@@ -1,6 +1,33 @@
 #include "../include/utility.h"
+#include <cmath>
 
 
+void init_vfp(double *U0, int nq, int np, 
+              double Lq, double Lp, double rms_gauss_q,
+               double rms_gauss_p)
+{
+  double dq = Lq/double(nq);
+  double dp = Lp/double(np);
+    
+  double* q = new double[nq];
+  double* p = new double [np];
+  for (int i=0; i<nq; i++){q[i]=-Lq/2. + double(i)*dq;}
+  for (int i=0; i<np; i++){p[i]=-Lp/2. + double(i)*dp;}
+  
+  //____initial condition: gauss - to do: from input argument____
+  // double rms_gauss_q = 1.2;
+  // double rms_gauss_p = 1.2;
+
+  for (int iq=0; iq<nq; iq++)
+    {
+      double q1 =q[iq];
+      for (int ip=0; ip<np; ip++)
+  {
+    double p1 = p[ip];
+    U0[iq*np+ip] = (1./(2.*rms_gauss_q*rms_gauss_p*M_PI))*exp(-(q1*q1)/(2.*rms_gauss_q*rms_gauss_q))*exp(-(p1*p1)/(2.*rms_gauss_p*rms_gauss_p));
+  }
+    }
+}
 
 void force_co_from_projection_plus_shot_noise(double * U, double dt, double t, int grand_n, int nq, int np, double* density, double*  wf_free_space_and_parallel_plate_integ_part,  complex<double>* impedance_final, fftw_plan pfor, fftw_plan pback,  complex<double> *  tf_g,  complex<double> *  tmp_tf, double I, double* force )
 {
@@ -65,7 +92,7 @@ void vlasov(double dt, double * U0, double * U1, int nq, int np, double dq, doub
       double Zij[2];
       double MZij[2];
       Zij[0] = q[iq];
-
+      
       for (int ip=0; ip<np;ip++)
         {
 	  Zij[1] = p[ip];
@@ -77,7 +104,20 @@ void vlasov(double dt, double * U0, double * U1, int nq, int np, double dq, doub
 	  // integer part
 	  k = int((MZij[0]- q[0])/dq);
 	  l = int((MZij[1]- p[0])/dp);
-      
+    
+    // double q_index = (MZij[0] - q[0]) / dq;
+    // double p_index = (MZij[1] - p[0]) / dp;
+    // if (!std::isfinite(q_index) || !std::isfinite(p_index) ||
+    //     q_index < 1. || q_index >= nq - 1 ||
+    //     p_index < 1. || p_index >= np - 1)
+    //   {
+    //     U1[iq*np + ip] = 0.;
+    //     continue;
+    //   }
+    // k = int(q_index);
+    // l = int(p_index);
+
+
 	  if((k-1)>=0 && (k+1)<nq && (l-1)>=0 && (l+1)<np )
 	    {
 	      x = (MZij[0]- q[k])/dq;
