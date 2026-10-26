@@ -1,56 +1,64 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from module_vfp import integ_vfp, init_vfp
+from module_vfp import integ_vfp, init_vfp, init_WF
 t1 = 0.0
-t2 = 20.
-nt = 800
+t2 = 3.18 #63.118 #pertiod 3.18
+nt = 1000
+#Define dt instead of giving ntint. Keep in mind the CFL condition.
 ntint=10
-n_q = 80
-n_p = 80
+n_q = 200
+n_p = 200
 Lq = 20.
 Lp = 20.
 grand_L = 40.
 rms_gauss_p = 1.2
 rms_gauss_q = 1.2
 #Initialize the VFP distribution using the init_vfp function
-U0 = init_vfp(n_q, n_p, Lq, Lp, rms_gauss_q, rms_gauss_p)
-# print("Type of the initial distribution:  ", type(U0))
-# print("Length of the initial distribution:  ", len(U0))
+init_WF(n_q, Lq, grand_L)
 
+U_init = init_vfp(n_q, n_p, Lq, Lp, rms_gauss_q, rms_gauss_p)
+
+U0 = U_init.copy()
 sol = integ_vfp(U0, t1, t2 , nt, ntint, n_q, n_p, Lq, Lp, grand_L)
-print("Type of the solution:  ", type(sol.y))
-print("Mass ini and mass fin: ", sol.mass[0], sol.mass[-1])
-print("density length", len(sol.density))
 
-#Computing the action of the monodromy matrix over a vector v using the flow sol
 
-v = np.zeros(n_q * n_p, dtype=np.float64)
-v[0] = 1.0  #
-epsilon = 1e-6
-U_pert = U0 + epsilon * v
-sol_pert = integ_vfp(U_pert, t1, t2 , nt, ntint, n_q, n_p, Lq, Lp, grand_L)
-Mv =  (sol_pert.y - sol.y)/epsilon
+v = np.random.default_rng(0).random(n_q * n_p)
+direction = U_init * v
+epsilons = np.logspace(-1, -10, 10)
+MV = []
 
-print("Type of the monodromy matrix action:  ", type(Mv))
-print("Size of the monodromy matrix action: ", len(Mv))
+for epsilon in epsilons:
+    U_pert = U_init + epsilon * direction
+    sol_pert = integ_vfp(U_pert.copy(), t1, t2, nt, ntint, n_q, n_p, Lq, Lp, grand_L)
+    MV.append((sol_pert.y - sol.y) / epsilon)
 
-#Test of the finite difference approximation of the monodromy matrix action
-Epsi = [1e-6, 1e-7, 1e-8, 1e-9]
-Norm_dif = np.zeros(len(Epsi))
-for k, epsilon in enumerate(Epsi):
-    U_pert = U0 + epsilon * v
-    sol_pert = integ_vfp(U_pert, t1, t2 , nt, ntint, n_q, n_p, Lq, Lp, grand_L)
-    Mv =  (sol_pert.y - sol.y)/epsilon
-    Norm_dif[k] = np.linalg.norm(epsilon * Mv)
-    print(f"epsilon: {epsilon}, norm of the difference: {Norm_dif[k]}")
+MV = np.asarray(MV)
 
-plt.figure()
-plt.loglog(Epsi, Norm_dif, marker='o')
-plt.xlabel('epsilon')
-plt.ylabel('Norm of the difference')
-plt.title('Convergence of the finite difference approximation of the monodromy matrix action')
-plt.grid()
+errors = np.linalg.norm(np.diff(MV, axis=0), ord=np.inf, axis=1)
+
+scale = max(np.linalg.norm(MV[-1], ord=np.inf), np.finfo(float).tiny)
+
+relative_errors = errors / scale
+
+relative_errors = np.maximum(relative_errors, np.finfo(float).tiny)
+
+rates = np.log(relative_errors[:-1] / relative_errors[1:]) / np.log(
+    epsilons[:-2] / epsilons[1:-1]
+)
+
+plt.figure(figsize=(22/2.54, 16/2.54), dpi=200)
+plt.loglog(epsilons[:-1], relative_errors, marker="o", label="Successive errors")
+plt.loglog(
+    epsilons[:-1],
+    relative_errors[0] * epsilons[:-1] / epsilons[0],
+    "--",
+    label="Slop P1",
+)
+plt.xlabel(r"$\varepsilon$")
+plt.ylabel(r"relative $\|Mv_\varepsilon-Mv_{\varepsilon/10}\|_\infty$")
+plt.title("Mv computation using first-order FD: Convergence test")
+plt.grid(True, which="both")
+plt.legend()
+plt.savefig("convergence_plot.png")
 plt.show()
-plt.savefig('convergence_plot.png')
-
-
+print("Observed convergence rates:", rates)

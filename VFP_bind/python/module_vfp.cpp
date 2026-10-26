@@ -22,8 +22,10 @@ PYBIND11_MODULE(module_vfp, m)
         .def_property_readonly("y", [](const VfpResults& result) { return to_numpy(result.y); })
         .def_property_readonly("t", [](const VfpResults& result) { return to_numpy(result.t); })
         .def_property_readonly("density", [](const VfpResults& result) { return to_numpy(result.density); })
-        .def_property_readonly("mass", [](const VfpResults& result) { return to_numpy(result.mass); });
-    
+        .def_property_readonly("mass", [](const VfpResults& result) { return to_numpy(result.mass); })
+        .def_property_readonly("Pthz", [](const VfpResults& result) { return to_numpy(result.Pthz); });
+    m.def("init_WF", &init_WF, "Initialize wakefield parameters", py::arg("nq"), py::arg("Lq"), py::arg("grand_L"));
+
     m.def("init_vfp",
           [](int nq, int np, double Lq, double Lp, double rms_gauss_q, double rms_gauss_p) {
               std::vector<double> values = init_vfp(nq, np, Lq, Lp, rms_gauss_q, rms_gauss_p);
@@ -46,5 +48,4 @@ PYBIND11_MODULE(module_vfp, m)
         "Integrate VFP equations over time interval [t1, t2]",
         py::arg("U0"), py::arg("t1"), py::arg("t2"), py::arg("nt"), py::arg("ntint"),
         py::arg("nq"), py::arg("np"), py::arg("Lq"), py::arg("Lp"), py::arg("grand_L"));
-    
 }

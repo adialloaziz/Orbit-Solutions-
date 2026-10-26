@@ -170,3 +170,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+VFP_bind/LESSON_REPORT.md

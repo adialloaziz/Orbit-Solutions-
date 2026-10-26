@@ -10,6 +10,10 @@
 #include <gsl/gsl_sf.h>
 #include <gsl/gsl_integration.h>
 #include <fftw3.h>
+#include <iostream>
+#include <fstream>
+#include <cmath>
+#include <math.h>
 using namespace std;
 
 struct Params {
@@ -20,7 +24,7 @@ struct Params {
 void free_space_and_parallel_plates_integ_part(double * g,  double * convol, complex<double>* impedance, fftw_plan pfor, fftw_plan pback, int nq,     complex<double> * tf_g,  complex<double> *tmp_tf);
 //1) tab "free_space_and_parallel_plates_integ_part_fftfactor" (calculated by init_WF.cpp)
 
-std::vector<double> init_vfp(int nq, int np, 
+vector<double> init_vfp(int nq, int np, 
               double Lq, double Lp, double rms_gauss_q,
                double rms_gauss_p);
 
@@ -37,5 +41,8 @@ double root(double x, double k);
 double w(double q, double du_sur_dq);
 //to use gsl
 double v_wrapper(double q,void* parptr); //before name: v_Cfunction
+
+
+void init_WF(int nq, double Lq, double grand_L);
 
 #endif //UTILITY_H

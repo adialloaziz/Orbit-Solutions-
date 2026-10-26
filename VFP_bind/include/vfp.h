@@ -1,19 +1,20 @@
 #ifndef VFP_H
 #define VFP_H
 
-
-#pragma once
-#include<iostream>
-#include<fstream>
-#include<math.h>
-#include<vector>
+// #pragma once
+// #include<iostream>
+// #include<fstream>
+// #include<math.h>
+// #include<vector>
 #include "../include/utility.h"
 
 struct VfpResults {
-    std::vector<double> y;//f(q,p) at the final time
-    std::vector<double> t; // time vector where the solution is evaluated
-    std::vector<double> density; // density wrt q over the time interval t
-    std::vector<double> mass; 
+    vector<double> y;//f(q,p) at the final time
+    vector<double> t; // time vector where the solution is evaluated
+    vector<double> density; // density wrt q over the time interval t
+    vector<double> mass;
+    vector<double> Pthz; // THz power over the time interval t
+    //add Pthz
 };
 
 VfpResults integ_vfp(double *U0, double t1,

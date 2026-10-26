@@ -33,8 +33,8 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
   */
 {
   //output
-  ofstream o_info; o_info.open("info.txt");
-  ofstream o_tmp; o_tmp.open("tmp.txt");
+  // ofstream o_info; o_info.open("info.txt");
+  // ofstream o_tmp; o_tmp.open("tmp.txt");
   
   
   //----------parameters---------------
@@ -57,16 +57,16 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
   double _e=1.602e-19; //C
   double E0=2.75e9; //eV
   double energy_spread=1.017e-3; //normalized by E0
-  double I=0.44e-3; //A (ou 0.44 ?)
-  double fs=1467; //sync. fq. s-1
+  double I=8.044e-5*2.; //alphaby10=0.44e-3; //A (ou 0.44 ?)
+  double fs=928; //alphaby10=  1467; //sync. fq. s-1
   double omega_s=2.*M_PI*fs; 
   double td=3.27e-3; //s
   double T0=1.181e-6; //s
     
   double sigma_e = energy_spread * E0*_e; //C
-  double sigma_z = 1.45e-3; //unit ?
-  double gamma = E0/0.511e6; // cout<<"gamma="<<gamma<<endl;
-  double epsilon = 1./(omega_s*td);
+  double sigma_z =0.92e-3; //alphaby10=1.45e-3; //unit ?
+  double gamma = E0/0.511e6; //cout<<"gamma="<<gamma<<endl;
+  double epsilon = 1./(omega_s*td)/10.;
   double Nelectrons=I*T0/_e;
   // cout<<"Number of electrons per bunch: "<<Nelectrons<<endl;
   double* density = new double[nq];
@@ -74,8 +74,9 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
   //___ wakefield___
   //before : Wake_1 = new Wakefield(grand_n,grand_L,R,gamma,sigma_z,h,To,k_max,inductance,resistance);
   complex<double> *free_space_and_parallel_plates_integ_part_fftfactor=new complex<double>[grand_n/2+1]; //to replace by input argument
-  //read instead
+  // read instead
   ifstream i1; i1.open("impedance.txt"); i1.precision(15);
+
   double re, im;
   for(int iq=0; iq<grand_n/2 +1; iq++) {
     i1>>re>>im;
@@ -100,7 +101,9 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
   double*  force = new double[nq];
 
   // cout<<"Ic1="<<Ic1<<" sigma_e="<<sigma_e<<" omega_s="<<omega_s<<" T0="<<T0<<endl;
-  for(int i=0; i<grand_n/2+1; i++){impedance_final[i]=Ic1*free_space_and_parallel_plates_integ_part_fftfactor[i]; o_tmp<<real(impedance_final[i])<<" "<<imag(impedance_final[i])<<endl;}
+  for(int i=0; i<grand_n/2+1; i++){impedance_final[i]=Ic1*free_space_and_parallel_plates_integ_part_fftfactor[i];
+    //  o_tmp<<real(impedance_final[i])<<" "<<imag(impedance_final[i])<<endl;
+    }
   
   //___ info ___
   complex<double> * tf_density  = new complex<double>[nq];
@@ -118,6 +121,7 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
     sol.y.resize(nq*np); //The solution vector at the given time
     sol.t.resize(nt); //The time vector where the solution is evaluated
     sol.density.resize(nt*nq); //Resize the density vector
+    sol.Pthz.resize(nt); //Resize the THz power vector
     sol.mass.resize(nt); //Resize the mass vector
 
   //projection to get initial density
@@ -155,7 +159,7 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
                 }
             }	  
           
-          //projection
+          //projection to get density in the longitudinal direction (result in density)
           for (int iq=0; iq<nq; iq++)
             {
               density[iq]=0;
@@ -174,10 +178,10 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
       //
       double mass = info_area(nq, density, dq);
       sol.mass[i] = mass;
-      o_info<<i<<" "<<tf<<" "<<mass<<" "<<info_rms(nq, dq, density, q)<<" "<<Pthz<<endl;
+      sol.Pthz[i] = Pthz;
+      // o_info<<i<<" "<<tf<<" "<<mass<<" "<<info_rms(nq, dq, density, q)<<" "<<Pthz<<endl;
       sol.t[i] = tf; //Store the time value
     }//i
     sol.y.assign(U0, U0 + nq * np); //Copy the final solution to the result vector
-    // sol.t.assign(time_vector.begin(), time_vector.end()); //Copy the time interval to the result vector
     return sol;
 }
