@@ -17,8 +17,9 @@ struct VfpResults {
     //add Pthz
 };
 
-VfpResults integ_vfp(double *U0, double t1,
-                    double t2, double I, int nt, int ntint,
-                    int nq, int np, double Lq, double Lp, double grand_L);
+VfpResults integ_vfp(double *U0,double *H, double t1, double t2, double I,
+                    double alpha_unfold,
+                    int nt, int ntint, int nq,
+                    int np, double Lq, double Lp, double grand_L);
 
 #endif //VFP_H

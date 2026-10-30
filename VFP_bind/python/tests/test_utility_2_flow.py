@@ -22,6 +22,14 @@ except ImportError:
     pass
 
 
+def mass_weights(n_q, n_p, Lq, Lp):
+    q_weights = np.ones(n_q)
+    p_weights = np.ones(n_p)
+    q_weights[[0, -1]] = 0.5
+    p_weights[[0, -1]] = 0.5
+    return (Lq / n_q) * (Lp / n_p) * np.kron(q_weights, p_weights)
+
+
 class FlowMonodromyTests(unittest.TestCase):
     def setUp(self):
         self.matrix = np.array([[0.0, 1.0], [-2.0, -0.5]])
@@ -132,6 +140,8 @@ class VFPFlowMonodromyTests(unittest.TestCase):
     def test_monodromy_action_matches_direct_vfp_flow_difference(self):
         solv_args = {
             "I": 8.044e-5*2.,
+            "alpha_unfold": 1e-6,
+            "H": mass_weights(8, 8, 20.0, 20.0),
             "nt": 2,
             "ntint": 2,
             "n_q": 8,
@@ -143,13 +153,15 @@ class VFPFlowMonodromyTests(unittest.TestCase):
         }
         rms_gauss_q = 1.2
         rms_gauss_p = 1.2
-
-        def vfp_flow(y, T, I, *, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
+        
+        def vfp_flow(y, T, I, alpha_unfold, *, H, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
             result = vfp_module.integ_vfp(
                 np.asarray(y, dtype=np.float64).copy(),
+                H,
                 0.0,
                 T,
                 I,
+                alpha_unfold,
                 nt,
                 ntint,
                 n_q,
@@ -167,6 +179,7 @@ class VFPFlowMonodromyTests(unittest.TestCase):
                 vfp_module.init_WF(
                     solv_args["n_q"], solv_args["Lq"], solv_args["grand_L"]
                 )
+
                 model = VFPModel(solver_args=solv_args)
                 y0 = vfp_module.init_vfp(
                     solv_args["n_q"],
@@ -178,7 +191,8 @@ class VFPFlowMonodromyTests(unittest.TestCase):
                 ) #Initial state
                 direction = np.random.default_rng(0).standard_normal(y0.size)
                 direction /= np.linalg.norm(direction)
-                print("Direction or v shape ", direction.ndim)
+
+                
                 T = 1e-3
                 epsilon = 1e-6
                 y0_copy = y0.copy()
@@ -203,6 +217,8 @@ class VFPFlowMonodromyTests(unittest.TestCase):
     def test_newton_orbit_runs_with_vfp_solver(self):
         solv_args = {
             "I": 8.044e-5*2.,
+            "alpha_unfold": 1e-6,
+            "H": mass_weights(10, 10, 20.0, 20.0),
             "nt": 100,
             "ntint": 10,
             "n_q": 10,
@@ -246,6 +262,8 @@ class VFPFlowMonodromyTests(unittest.TestCase):
     def test_newton_picard_sub_proj_runs_with_vfp_solver(self):
         solv_args = {
             "I": 8.044e-5*2.,
+            "alpha_unfold": 1e-6,
+            "H": mass_weights(40, 40, 20.0, 20.0),
             "nt": 20,
             "ntint": 2,
             "n_q": 40,
@@ -305,6 +323,77 @@ class VFPFlowMonodromyTests(unittest.TestCase):
                 self.assertEqual(states.shape, (10, y0.size))
                 self.assertEqual(residuals.shape, (10,))
                 self.assertEqual(abs_errors.shape, (10,))
+                self.assertIn(converged, (-1, 0, 1))
+                self.assertTrue(np.all(np.isfinite(periods)))
+                self.assertTrue(np.all(np.isfinite(states)))
+                np.testing.assert_array_equal(y0, y0_copy)
+        finally:
+            os.chdir(previous_directory)
+
+    def test_np_mass_conserv_runs_with_vfp_solver(self):
+        n_q = 40
+        n_p = 40
+        Lq = 20.0
+        Lp = 20.0
+        alpha_unfold = 1e-6
+        solv_args = {
+            "I": 8.044e-5 * 2.0,
+            "alpha_unfold": alpha_unfold,
+            "H": mass_weights(n_q, n_p, Lq, Lp),
+            "nt": 20,
+            "ntint": 2,
+            "n_q": n_q,
+            "n_p": n_p,
+            "Lq": Lq,
+            "Lp": Lp,
+            "grand_L": 40.0,
+        }
+
+        previous_directory = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as working_directory:
+                os.chdir(working_directory)
+                vfp_module.init_WF(n_q, Lq, solv_args["grand_L"])
+                y0 = vfp_module.init_vfp(n_q, n_p, Lq, Lp, 1.2, 1.2)
+                model = VFPModel(solver_args=solv_args)
+                orbit_finder = orbit(model, y0, solv_args)
+
+                flow_direction = orbit_finder.flow_direction(y0)
+                flow_direction /= np.linalg.norm(flow_direction)
+                p0, pe = 5, 4
+                basis_size = p0 + pe
+                coordinate_indices = np.argsort(np.abs(flow_direction))[:basis_size - 1]
+                transverse = np.zeros((y0.size, basis_size - 1))
+                transverse[coordinate_indices, np.arange(basis_size - 1)] = 1.0
+                initial_basis, _ = np.linalg.qr(
+                    np.column_stack((flow_direction, transverse)), mode="reduced"
+                )
+                y0_copy = y0.copy()
+
+                result = orbit_finder.NP_mass_conserv(
+                    model=model,
+                    y_0=y0,
+                    T_0=3.0,
+                    I_0=solv_args["I"],
+                    alpha_unfold=alpha_unfold,
+                    Max_iter=10,
+                    epsilon=1e-8,
+                    H=solv_args["H"],
+                    subsp_iter=1,
+                    Ve_0=initial_basis,
+                    p0=p0,
+                    pe=pe,
+                    rho=0.5,
+                    l=2,
+                )
+
+                iteration, periods, states, residuals, abs_errors, rel_errors, converged, masses = result
+            
+                self.assertEqual(periods.shape, (10,))
+                self.assertEqual(states.shape, (10, y0.size))
+                self.assertEqual(residuals.shape, (10,))
+                self.assertEqual(abs_errors.shape, (10,))
+                self.assertEqual(rel_errors.shape, (10,))
                 self.assertIn(converged, (-1, 0, 1))
                 self.assertTrue(np.all(np.isfinite(periods)))
                 self.assertTrue(np.all(np.isfinite(states)))

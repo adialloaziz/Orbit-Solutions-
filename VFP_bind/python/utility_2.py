@@ -111,7 +111,7 @@ class orbit:
     #     # flow_base = self.flow(y, T)
     #     return (flow_plus - self.flow(y, T)) / delta_param
 
-    def monodromy_mult(self,y, T, v, method = 1, epsilon = 1e-6):
+    def monodromy_mult(self,y, T, v, epsilon = 1e-6):
             """
                 M*v Matrix-vector multiplication using 
                 difference formula to avoid computing the monodromy matrix.
@@ -288,7 +288,7 @@ class orbit:
         
         return Delta_p_bar, Delta_T, B
 
-    def newton_correction_mass(self, dr_dalpha, y, T, alpha, Vp, Wp, Delta_q_r, Delta_q_alpha, y_tild,H,m0):
+    def newton_correction_mass(self, dr_dalpha, y, T, Vp, Wp, Delta_q_r, Delta_q_alpha, y_tild,H,m0):
         """
         Perform Newton correction for the orbit finding method with mass conservation.
         Args:
@@ -309,13 +309,14 @@ class orbit:
         # T_unit = 1.0 #For the scaled time variable
         Sp = Vp.T @ Wp
         Ip = np.eye(Vp.shape[1])
-        M_Delta_q_alpha = self.monodromy_mult_matvec(y, T, Delta_q_alpha, method=2, epsilon=1e-6) #M @ Delta_q_alpha
-        M_Delta_q_r = self.monodromy_mult_matvec(y, T, Delta_q_r, method=2, epsilon=1e-6) #M @ Delta_q_r
+        M_Delta_q_alpha = self.monodromy_mult(y, T, Delta_q_alpha, epsilon=1e-6) #M @ Delta_q_alpha
+        M_Delta_q_r = self.monodromy_mult(y, T, Delta_q_r, epsilon=1e-6) #M @ Delta_q_r
         # Phase condition
-        s = (y + Delta_q_r - y_tild) @ self.f(T, y_tild) #Taylor approx of the rhs 
-        ds_dy = self.f(T, y_tild) #Derivative wrt y
+        c1 = self.flow_direction(y_tild,delta=1e-6)
+        s = (y + Delta_q_r - y_tild) @ c1 #self.f(T, y_tild) #Taylor approx of the rhs 
+        ds_dy =c1 #Derivative wrt y
         ds_dT = 0.0 #(y + Delta_q_r - y_tild)@(self.f(T,y_tild) - alpha*H) #Derivative wrt T
-        ds_dalpha = -(y + Delta_q_r - y_tild)@(H) #Derivative wrt alpha
+        ds_dalpha = -(y + Delta_q_r - y_tild) @ H #Derivative wrt alpha
 
         # Mass conservation condition
         #Delta_m = H @ y - m0
@@ -325,7 +326,7 @@ class orbit:
         dm_dalpha = 0.0 #derivative wrt alpha
 
         # Periodicity condition
-        dr_dT = self.f(T,y) #- alpha*H #self.f(T,y)
+        dr_dT = self.flow_time_derivative(y,T, delta=1e-6) #f(T,y) #- alpha*H #self.f(T,y)
         # _, dr_dalpha = self.integ_sensitivity(y, np.zeros(self.dim), T, f_param = -T*H)
         # Build augmented linear system [A | b]
         top = np.hstack((Sp - Ip, (Vp.T@dr_dT).reshape(-1, 1), (Vp.T@(dr_dalpha+M_Delta_q_alpha)).reshape(-1, 1)))
@@ -335,12 +336,7 @@ class orbit:
         Mat = np.vstack((top, middle, bottom))
         # Right-hand side (Taylor approx)
         
-        sol = self.ode_solver(fun=self.f, t_span=[0.0, T], y0=y + M_Delta_q_r,
-                              t_eval=[T], method="BDF",
-                              jac=self.Jacf,
-                              rtol=1e-7, atol=1e-9)
-        
-        r_y0_deltaq = sol.y[:, -1] - y
+        r_y0_deltaq = self.flow(y + M_Delta_q_r, T,**self.solver_args) - y
         B = np.concatenate((Vp.T @ r_y0_deltaq, np.array([s]),np.array([dm])))
 
         XX = solve(Mat, -B)
@@ -520,16 +516,18 @@ class orbit:
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
         return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged,mass
 
-
-
-
-    def NP_mass_conserv_scal(self,model, y_0, T_0, alpha_0, Max_iter, epsilon,h=1, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
+    def NP_mass_conserv(self,model, y_0, T_0, I_0, alpha_unfold, Max_iter, epsilon,H, subsp_iter=1, Ve_0 = None, p0=5, pe=4, rho=0.5,l=2, full_sub_iter=True):
         #h is the spatial step size
         """----------Initialization--------"""
         y_star = y_0.copy()
-        alpha = alpha_0
+        model.solver_args["alpha_unfold"] = alpha_unfold
+        model.solver_args["I"] = I_0
+        self.solver_args = model.solver_args
+        self.solver_args["alpha_unfold"] = alpha_unfold
+        self.solver_args["I"] = I_0
+
+        alpha = alpha_unfold
         T_star = T_0
-        # y_prev = y_0.copy()
         p = p0
 
         y_by_iter = np.zeros((Max_iter, self.dim))
@@ -540,52 +538,39 @@ class orbit:
         Rel_Err = np.zeros(Max_iter)
 
         Ve = Ve_0.copy()  # Orthonormal set for plausible dominant subspace
-        # I = np.eye(self.dim)
-        H = h*np.ones_like(y_star)
-        m0 = H @ y_0
-        #T_unit = 1.0
-        #Initial projectors
-        # P = Ve[:,:p] @ Ve[:,:p].T
-        # Q = I - P
-        # y_picard = Q @ y_star
-        # y_newton = P @ y_star
-        T_unit = 1.0
-
+        m0 = H @ y_0 # For non-linear invariant H, we will use a function of y.
 
         """----------------Shooting loop---------------------------"""
         for k in range(Max_iter):
-            self.f = lambda t,y: T_star*model.dydt(t,y) + alpha*H #because aplha will evolve.
-            self.Jacf = lambda t,y: T_star*(model.jacobian(t,y) ) #Jacobian of f with respect to y
+            # self.f = (lambda t,y: model.dydt(t,y) - alpha*H) #because aplha will evolve.
             # Step 1: Solve the ODE to get phi(T)
-            phi_interp = self.ode_solver(
-                fun=self.f, t_span=[0.0, T_unit], t_eval=[T_unit], y0=y_star,
-                method="BDF", rtol=1e-7, atol=1e-9, jac=self.Jacf, dense_output=True
-            )
-            phi_T = phi_interp.y[:, -1].copy()
+            phi_T = self.flow(y_star,T_star,**self.solver_args)
             #________________________________________________________________#
             """------Step 2: Compute dominant subspace via subspace iteration with projection"""
             #Deciding whether to use the full subspace iteration or the subspace iteration with projection
             nu_sub = subsp_iter if (full_sub_iter or k==0) else 1
-            _, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_unit,rho,p0, pe, nu_sub, epsilon)
-            
-            p = max(1, p_1)  # Ensure p > 0
+            _, Ye, Ve, We,p_1 = self.subsp_iter_projec(Ve, y_star, T_star,rho,p0, pe, nu_sub, epsilon)
+            p = max(p0, p_1)  # Ensure p > 0
             Vp = Ve @ Ye[:, :p]
             #________________________________________________________________#
             """------Step 3: Picard correction (NPGS(l=2))-----------------"""
-            
+            #Update the projectors
+            # P = Vp @ Vp.T
+            # Q = np.eye(self.dim) - P
             #Moore-Spence formulation 
-            # _, dr_dalpha = self.integ_sensitivity(y_star, np.zeros(self.dim), T_unit, f_param = H)
-            dr_dalpha = self.integ_sensitivity2(S0=np.zeros(self.dim), phi_t = phi_interp, T=T_unit, f_param = H) 
-            Delta_q_r = self.picard_correction(y = y_star,T = T_unit,r = phi_T-y_star,phi_t=phi_interp, Vp=Vp,l=l)
-            Delta_q_alpha = self.picard_correction(y = y_star,T = T_unit,r = dr_dalpha,phi_t=phi_interp, Vp=Vp,l=l)
+            dr_dalpha = self.flow_parameter_derivative(
+                y_star, T_star, "alpha_unfold", delta_param=1e-6
+            )   
+            
+            Delta_q_r = self.picard_correction(y = y_star,T = T_star,r = phi_T-y_star, Vp=Vp,l=l)
+            Delta_q_alpha = self.picard_correction(y = y_star,T = T_star,r = dr_dalpha, Vp=Vp,l=l)
             #_________________________________________________________________#
             """------Step 4: Newton correction------------------------------"""
             # Wp = M @ Vp 
             Wp = We[:,:p]
-            Delta_p , Delta_T, Delta_alpha, B = self.Newton_correction_mass_scal(
-                unscaled_f = model.dydt,
+            Delta_p , Delta_T, Delta_alpha, B = self.newton_correction_mass(
                 dr_dalpha = dr_dalpha,
-                y = y_star,T = T_unit, alpha = alpha,Delta_q_alpha= Delta_q_alpha, Delta_q_r = Delta_q_r, Vp = Vp, Wp = Wp,
+                y = y_star,T = T_star, Delta_q_alpha= Delta_q_alpha, Delta_q_r = Delta_q_r, Vp = Vp, Wp = Wp,
                 y_tild = y_0, H = H,m0=m0
             )
             Delta_q = Delta_q_r + Delta_alpha * Delta_q_alpha
@@ -596,11 +581,13 @@ class orbit:
             # y_prev = y_star.copy()
             y_star += Delta_y
             T_star += Delta_T
-            alpha += Delta_alpha  
+            alpha += Delta_alpha
+            #update the parameter in solver_args
+            self.solver_args["alpha_unfold"] = alpha  
             #________________________________________________________________#
             """----Step 7: Convergence check-------------------------------"""
             y_by_iter[k, :] = y_star
-            mass[k] = h*np.sum(y_star, axis=0)
+            mass[k] = H @ y_star #h*np.sum(y_star, axis=0)
             Abs_Err[k] = np.linalg.norm(Delta_y, ord=np.inf)
             Rel_Err[k] = Abs_Err[k]/np.linalg.norm(y_star, ord=np.inf)
             T_by_iter[k] = T_star
@@ -631,8 +618,6 @@ class orbit:
             elif k >= Max_iter-1:
                 converged = 0
                 print("Maximum number of iterations reached.")
-            
-        _, monodromy = self.integ_monodromy(y_star,np.eye(self.dim),T_unit)#Attention à tenir en compte le cas ou alpha est grand. La perturbation n'est plus nulle.
         # Final monodromy matrix computation
         # phi_T, monodromy = self.integ_monodromy(y_star, I, T_star)
-        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass,monodromy
+        return k, T_by_iter, y_by_iter, Norm_B, Abs_Err, Rel_Err, converged, mass

@@ -148,12 +148,14 @@ class VFPModel:
     #     p = np.linspace(-self.Lp / 2., self.Lp / 2., self.np, endpoint=False)
     #     return (dq, dp, q, p)
 
-    def flow(self, y, T, I, *, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
+    def flow(self, y, T, I, alpha_unfold, H, *, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
         result = integ_vfp(
                     np.asarray(y, dtype=np.float64).copy(),
+                    np.asarray(H, dtype=np.float64).copy(),
                     0.0,
                     T,
                     I,
+                    alpha_unfold,
                     nt,
                     ntint,
                     n_q,
@@ -163,12 +165,14 @@ class VFPModel:
                     grand_L,
                 ) 
         return result.y
-    def mass_over_time(self,y, T, I, *, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
+    def mass_over_time(self,y, T, I, alpha_unfold, H, *, nt, ntint, n_q, n_p, Lq, Lp, grand_L):
         result = integ_vfp(
                     np.asarray(y, dtype=np.float64).copy(),
+                    np.asarray(H, dtype=np.float64).copy(),
                     0.0,
                     T,
                     I,
+                    alpha_unfold,
                     nt,
                     ntint,
                     n_q,
@@ -179,9 +183,9 @@ class VFPModel:
                 )
         return result.mass
     
-    def flow_time_derivative(self, y, T, I, delta=1e-6):
+    def flow_time_derivative(self, y, T, delta=1e-6):
         # First-order difference in elapsed time; no vector field is required.
-        return (self.flow(y, T + delta, I, **self.solver_args) - self.flow(y, T, I, **self.solver_args)) / delta
+        return (self.flow(y, T + delta, **self.solver_args) - self.flow(y, T, **self.solver_args)) / delta
 
     def flow_direction(self, y,  delta=1e-6):
         # Approximate the orbit tangent at y from a short flow step.

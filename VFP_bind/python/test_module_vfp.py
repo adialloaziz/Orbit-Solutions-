@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from module_vfp import integ_vfp, init_vfp, init_WF
 t1 = 0.0
 t2 = 3.18 #63.118 #pertiod 3.18
+alpha_unfold = 1e-6
 I = 8.044e-5*2.
 nt = 1000
 #Define dt instead of giving ntint. Keep in mind the CFL condition.
@@ -20,13 +21,15 @@ init_WF(n_q, Lq, grand_L)
 U_init = init_vfp(n_q, n_p, Lq, Lp, rms_gauss_q, rms_gauss_p)
 
 U0 = U_init.copy()
-sol = integ_vfp(U0, t1, t2 ,I, nt, ntint, n_q, n_p, Lq, Lp, grand_L)
+# sol = integ_vfp(U0, t1, t2 ,I, nt, ntint, n_q, n_p, Lq, Lp, grand_L)
 
 dq = Lq/n_q
 dp = Lp/n_p
 w = np.ones(n_q)
 w[[0,-1]] = 0.5
 H = dp*dq*np.kron(w,w)
+
+sol = integ_vfp(U0,H, t1, t2 ,I, alpha_unfold, nt, ntint, n_q, n_p, Lq, Lp, grand_L)
 mass = H @ sol.y
 print("Mass using trapzoid rule", mass)
 print("Mass from the solver ", sol.mass[0], sol.mass[-1])

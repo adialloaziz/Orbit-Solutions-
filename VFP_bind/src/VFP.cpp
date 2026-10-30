@@ -7,13 +7,17 @@ using namespace std;
 //1) tab "free_space_and_parallel_plates_integ_part_fftfactor" (calculated by init_WF.cpp)
 //2) initial distribution U[nq*np]
 
-VfpResults integ_vfp(double *U0, double t1, double t2, double I,
+VfpResults integ_vfp(double *U0,double *H, double t1, double t2, double I,
+                    double alpha_unfold,
                     int nt, int ntint, int nq,
                     int np, double Lq, double Lp, double grand_L)
                     
   /*
   Args: 
       U0: Initial distribution (array or list of size nq*np).
+      H: The invariant for the unfolding. It is considered as a contraint in the periodic solution computation. For now it's the mass.
+      alpha_unfold: The unfolding parameter making the system dissipative.
+
       t1: Initial time: Type double, Default t1 = 0.0 .
       t2: Final time: Type double, Default t2 = 10.0
       I: Current Intensity or interaction intensity. Default I=8.044e-5*2.
@@ -150,6 +154,15 @@ VfpResults integ_vfp(double *U0, double t1, double t2, double I,
           vlasov(dt, U0, U1, nq,  np,  dq, dp,  q,  p, force);
           // Calcul du terme de Fokker-Planck. 
           // Attention: U1 calculé à partir de U0 et U1: partir de U1=U1+FP(U0)
+
+          // For the unfolding: U1=U1+FP(U0+alpha_unfold/(2epsilon)*H)
+          for (int iq =0; iq<nq; iq++)
+            {
+              for (int ip=0; ip<np; ip++)
+                {
+                  U0[iq*np+ip]=U0[iq*np+ip] + (alpha_unfold/(2*epsilon))*H[iq*np+ip];
+                }
+            }	
           fokker_planck_finite_diff_MPI(dt, U0, U1, dp, nq, np,  epsilon,  p);
           //U1-> U0
           for (int iq =0; iq<nq; iq++)
