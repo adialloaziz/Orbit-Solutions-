@@ -7,7 +7,7 @@ using namespace std;
 //1) tab "free_space_and_parallel_plates_integ_part_fftfactor" (calculated by init_WF.cpp)
 //2) initial distribution U[nq*np]
 
-VfpResults integ_vfp(double *U0, double t1, double t2,
+VfpResults integ_vfp(double *U0, double t1, double t2, double I,
                     int nt, int ntint, int nq,
                     int np, double Lq, double Lp, double grand_L)
                     
@@ -16,6 +16,7 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
       U0: Initial distribution (array or list of size nq*np).
       t1: Initial time: Type double, Default t1 = 0.0 .
       t2: Final time: Type double, Default t2 = 10.0
+      I: Current Intensity or interaction intensity. Default I=8.044e-5*2.
       nt: Number of time steps: Type int, Default nt = 200 .
       ntint: Number of intermediate time steps(for seek of precision): Type int, Default ntint = 1(No refinement) 
       nq: Number of spatial grid points in q: Type int, Default nq = 80.
@@ -57,7 +58,7 @@ VfpResults integ_vfp(double *U0, double t1, double t2,
   double _e=1.602e-19; //C
   double E0=2.75e9; //eV
   double energy_spread=1.017e-3; //normalized by E0
-  double I=8.044e-5*2.; //alphaby10=0.44e-3; //A (ou 0.44 ?)
+  // double I=8.044e-5*2.; //alphaby10=0.44e-3; //A (ou 0.44 ?)
   double fs=928; //alphaby10=  1467; //sync. fq. s-1
   double omega_s=2.*M_PI*fs; 
   double td=3.27e-3; //s

@@ -37,15 +37,15 @@ PYBIND11_MODULE(module_vfp, m)
 
     m.def(
         "integ_vfp",
-        [](py::array_t<double, py::array::c_style> U0, double t1, double t2, int nt, int ntint,
+        [](py::array_t<double, py::array::c_style> U0, double t1, double t2, double I, int nt, int ntint,
            int nq, int np, double Lq, double Lp, double grand_L) {
             auto info = U0.request();
             if (info.ndim != 1 || info.size != static_cast<py::ssize_t>(nq) * np) {
                 throw py::value_error("U0 must contain nq * np values");
             }
-            return integ_vfp(U0.mutable_data(), t1, t2, nt, ntint, nq, np, Lq, Lp, grand_L);
+            return integ_vfp(U0.mutable_data(), t1, t2, I, nt, ntint, nq, np, Lq, Lp, grand_L);
         },
         "Integrate VFP equations over time interval [t1, t2]",
-        py::arg("U0"), py::arg("t1"), py::arg("t2"), py::arg("nt"), py::arg("ntint"),
+        py::arg("U0"), py::arg("t1"), py::arg("t2"), py::arg("I"), py::arg("nt"), py::arg("ntint"),
         py::arg("nq"), py::arg("np"), py::arg("Lq"), py::arg("Lp"), py::arg("grand_L"));
 }

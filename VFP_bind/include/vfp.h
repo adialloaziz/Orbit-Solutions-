@@ -18,7 +18,7 @@ struct VfpResults {
 };
 
 VfpResults integ_vfp(double *U0, double t1,
-                    double t2, int nt, int ntint,
+                    double t2, double I, int nt, int ntint,
                     int nq, int np, double Lq, double Lp, double grand_L);
 
 #endif //VFP_H
